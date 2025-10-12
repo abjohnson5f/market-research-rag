@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "description": "Postgres Tool node for AI Agent - allows agent to execute SQL queries",
+    "usage": "Connect to AI Agent node - agent will write SQL dynamically based on user questions",
+    "source": "Cole Medin RAG template - Query Document Rows pattern"
+  },
+  "node": {
+    "parameters": {
+      "descriptionType": "manual",
+      "toolDescription": "Query the businesses table to find businesses matching criteria. You can filter by city, category, rating, review count, or any field in the business_data JSONB column. Use JSONB operators like ->, ->>, @>, ? for nested queries. Always include business_name in results. Examples:\n\nFind businesses in Phoenix:\nSELECT business_name, city, rating FROM businesses WHERE city = 'Phoenix';\n\nFind businesses with Instagram:\nSELECT business_name, business_data->'social'->>'instagrams' as instagram FROM businesses WHERE business_data->'social' ? 'instagrams';\n\nFind high-rated underserved opportunities:\nSELECT business_name, rating, review_count FROM businesses WHERE rating > 4.5 AND review_count < 20 ORDER BY rating DESC;",
+      "operation": "executeQuery",
+      "query": "={{ $fromAI('sql_query') }}",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.postgresTool",
+    "typeVersion": 2.5,
+    "position": [
+      -256,
+      368
+    ],
+    "id": "REPLACE_WITH_UNIQUE_ID",
+    "name": "Query Businesses Tool",
+    "credentials": {
+      "postgres": {
+        "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+        "name": "Your Postgres Connection"
+      }
+    }
+  },
+  "notes": {
+    "toolDescription": "This description is shown to the AI agent - teach it what queries are possible",
+    "fromAI": "$fromAI('sql_query') extracts the SQL the agent generates from its reasoning",
+    "safety": "The agent can only SELECT - it cannot DROP tables or modify data (read-only queries)"
+  }
+}

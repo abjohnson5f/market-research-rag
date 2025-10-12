@@ -1,0 +1,28 @@
+{
+  "meta": {
+    "description": "Postgres node template for creating tables - extracted from Cole Medin's RAG template",
+    "usage": "Copy this node, update the query parameter with your CREATE TABLE statement, then import to n8n",
+    "source": "RAG_AI_Agent_Template_V5.json"
+  },
+  "node": {
+    "parameters": {
+      "operation": "executeQuery",
+      "query": "-- Replace with your CREATE TABLE statement\nCREATE TABLE IF NOT EXISTS your_table_name (\n    id SERIAL PRIMARY KEY,\n    column_name TEXT,\n    created_at TIMESTAMP DEFAULT NOW()\n);",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.postgres",
+    "typeVersion": 2.5,
+    "position": [
+      -1632,
+      320
+    ],
+    "id": "REPLACE_WITH_UNIQUE_ID",
+    "name": "Create Your Table",
+    "credentials": {
+      "postgres": {
+        "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+        "name": "Your Postgres Connection"
+      }
+    }
+  }
+}

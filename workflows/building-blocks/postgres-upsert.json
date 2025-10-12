@@ -1,0 +1,109 @@
+{
+  "meta": {
+    "description": "Postgres UPSERT node - idempotent inserts that update on conflict",
+    "usage": "Use this for businesses table where apify_place_id is unique - prevents duplicates",
+    "source": "Cole Medin RAG template - document_metadata upsert pattern"
+  },
+  "node": {
+    "parameters": {
+      "operation": "upsert",
+      "schema": {
+        "__rl": true,
+        "mode": "list",
+        "value": "public"
+      },
+      "table": {
+        "__rl": true,
+        "value": "businesses",
+        "mode": "list",
+        "cachedResultName": "businesses"
+      },
+      "columns": {
+        "mappingMode": "defineBelow",
+        "value": {
+          "execution_id": "={{ $('Store Execution ID').first().json.execution_id }}",
+          "business_name": "={{ $json.business_name }}",
+          "search_string": "={{ $json.search_string }}",
+          "apify_place_id": "={{ $json.apify_place_id }}",
+          "business_data": "={{ JSON.stringify($json.business_data) }}"
+        },
+        "matchingColumns": [
+          "apify_place_id"
+        ],
+        "schema": [
+          {
+            "id": "apify_place_id",
+            "displayName": "apify_place_id",
+            "required": true,
+            "defaultMatch": true,
+            "display": true,
+            "type": "string",
+            "canBeUsedToMatch": true,
+            "removed": false
+          },
+          {
+            "id": "execution_id",
+            "displayName": "execution_id",
+            "required": false,
+            "defaultMatch": false,
+            "display": true,
+            "type": "number",
+            "canBeUsedToMatch": false,
+            "removed": false
+          },
+          {
+            "id": "business_name",
+            "displayName": "business_name",
+            "required": false,
+            "defaultMatch": false,
+            "display": true,
+            "type": "string",
+            "canBeUsedToMatch": false,
+            "removed": false
+          },
+          {
+            "id": "search_string",
+            "displayName": "search_string",
+            "required": false,
+            "defaultMatch": false,
+            "display": true,
+            "type": "string",
+            "canBeUsedToMatch": false,
+            "removed": false
+          },
+          {
+            "id": "business_data",
+            "displayName": "business_data",
+            "required": false,
+            "defaultMatch": false,
+            "display": true,
+            "type": "string",
+            "canBeUsedToMatch": false,
+            "removed": false
+          }
+        ]
+      },
+      "options": {
+        "queryBatching": "transaction"
+      }
+    },
+    "type": "n8n-nodes-base.postgres",
+    "typeVersion": 2.5,
+    "position": [
+      0,
+      0
+    ],
+    "id": "REPLACE_WITH_UNIQUE_ID",
+    "name": "Upsert Business",
+    "credentials": {
+      "postgres": {
+        "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+        "name": "Your Postgres Connection"
+      }
+    }
+  },
+  "notes": {
+    "matchingColumns": "The column used for ON CONFLICT - if apify_place_id exists, UPDATE instead of INSERT",
+    "queryBatching": "transaction = All items in single transaction for atomicity"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "meta": {
+    "description": "Postgres INSERT with batch transaction for reviews (one-to-many data)",
+    "usage": "Use for inserting multiple reviews efficiently - all or nothing transaction",
+    "source": "Cole Medin pattern for document_rows table"
+  },
+  "node": {
+    "parameters": {
+      "operation": "insert",
+      "schema": {
+        "__rl": true,
+        "mode": "list",
+        "value": "public"
+      },
+      "table": {
+        "__rl": true,
+        "value": "business_reviews",
+        "mode": "list",
+        "cachedResultName": "business_reviews"
+      },
+      "columns": {
+        "mappingMode": "defineBelow",
+        "value": {
+          "business_id": "={{ $json.business_id }}",
+          "review_data": "={{ $json.review_data }}"
+        },
+        "schema": [
+          {
+            "id": "business_id",
+            "displayName": "business_id",
+            "required": true,
+            "defaultMatch": false,
+            "display": true,
+            "type": "number",
+            "canBeUsedToMatch": false,
+            "removed": false
+          },
+          {
+            "id": "review_data",
+            "displayName": "review_data",
+            "required": true,
+            "defaultMatch": false,
+            "display": true,
+            "type": "string",
+            "canBeUsedToMatch": false,
+            "removed": false
+          }
+        ]
+      },
+      "options": {
+        "queryBatching": "transaction"
+      }
+    },
+    "type": "n8n-nodes-base.postgres",
+    "typeVersion": 2.5,
+    "position": [
+      0,
+      0
+    ],
+    "id": "REPLACE_WITH_UNIQUE_ID",
+    "name": "Insert Reviews Batch",
+    "credentials": {
+      "postgres": {
+        "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+        "name": "Your Postgres Connection"
+      }
+    }
+  },
+  "notes": {
+    "queryBatching": "transaction = All 500 reviews inserted in single transaction - if one fails, all roll back",
+    "performance": "Batch mode is 10-100x faster than individual inserts for large datasets"
+  }
+}
