@@ -1,0 +1,63 @@
+{
+  "name": "Tool - Query Businesses",
+  "nodes": [
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool to search for businesses in the database. You can filter by city, category, rating, review count, or query the business_data JSONB column for any field.\n\nTable schema:\n- business_name (TEXT) - Name of the business\n- city (TEXT) - City location (e.g. 'Phoenix', 'Seattle')\n- category (TEXT) - Business type (e.g. 'Coffee Shop', 'Auto Repair')\n- rating (DECIMAL) - Average rating from Google Maps (1.0 to 5.0)\n- review_count (INT) - Total number of reviews\n- website (TEXT) - Business website URL\n- phone (TEXT) - Contact phone number\n- business_data (JSONB) - Full business details with nested structure\n\nJSONB structure (access with -> and ->> operators):\n- business_data->'overview' - Contains city, category, rating fields\n- business_data->'contact' - Phone, website, address, emails, lat/lng\n- business_data->'social' - Instagram, Facebook, LinkedIn, TikTok URLs\n- business_data->'rating' - totalScore, reviewsCount, distribution, tags\n- business_data->'popular_times' - Traffic histogram by day/hour\n- business_data->'tags' - Array of tags from reviews and categories\n\nExample queries:\n\nFind businesses in specific city:\nSELECT business_name, category, rating, review_count FROM businesses WHERE city = 'Phoenix' ORDER BY rating DESC LIMIT 10;\n\nFind high-rated with low reviews (underserved):\nSELECT business_name, city, rating, review_count FROM businesses WHERE rating > 4.5 AND review_count < 30 ORDER BY rating DESC;\n\nFind businesses with Instagram:\nSELECT business_name, city, business_data->'social'->>'instagrams' as instagram FROM businesses WHERE business_data->'social' ? 'instagrams' AND business_data->'social'->>'instagrams' != '';\n\nCategory analysis:\nSELECT category, COUNT(*) as count, ROUND(AVG(rating), 2) as avg_rating, SUM(review_count) as total_reviews FROM businesses WHERE city = 'Phoenix' GROUP BY category HAVING COUNT(*) > 3 ORDER BY total_reviews DESC;\n\nBusiness contact information:\nSELECT business_name, city, phone, website, business_data->'contact'->>'emails' as emails FROM businesses WHERE city = 'Phoenix' AND website IS NOT NULL;\n\nFind businesses by location proximity:\nSELECT business_name, city, (business_data->'contact'->>'latitude')::DECIMAL as lat, (business_data->'contact'->>'longitude')::DECIMAL as lng FROM businesses WHERE city = 'Phoenix' AND business_data->'contact' ? 'latitude';\n\nALWAYS include business_name in your SELECT. Use ORDER BY and LIMIT to keep results manageable. Return maximum 50 rows unless specifically asked for more.",
+        "operation": "executeQuery",
+        "query": "={{ $fromAI('sql_query') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        380,
+        240
+      ],
+      "id": "query-businesses-tool",
+      "name": "Query Businesses Tool",
+      "credentials": {
+        "postgres": {
+          "name": "Market Research DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Query Businesses Tool\n\n**Purpose:** Give AI the ability to search and filter businesses\n\n**When to use:**\n- \"Show me businesses in [city]\"\n- \"Find [category] businesses\"\n- \"Which businesses have Instagram?\"\n- \"List high-rated businesses with few reviews\"\n\n**Key features:**\n- Filters by city, category, rating, review_count\n- JSONB queries for nested data (social media, contact info)\n- Aggregations for category analysis\n\n**The Magic:** `$fromAI('sql_query')` extracts SQL from AI reasoning\n\n**Security:** Read-only (SELECT queries only)\n\n**To use in your workflow:**\n1. Import this JSON\n2. Update credentials to your Postgres connection\n3. Connect to AI Agent's `ai_tool` port\n4. Activate and test\n\n**Example conversation:**\nYou: \"Show me coffee shops in Phoenix\"\nAI: [Uses this tool to execute SQL]\n    \"I found 23 coffee shops in Phoenix...\"\n\n**Based on:** Cole Medin's RAG AI Agent Template V5",
+        "height": 523.6962750716333,
+        "width": 442.3277459477904,
+        "color": 4
+      },
+      "id": "sticky-note-docs",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        60
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "market-research-rag"
+  },
+  "tags": [
+    {
+      "name": "ai-tool",
+      "id": "tool-query-businesses"
+    },
+    {
+      "name": "postgres",
+      "id": "postgres-tool"
+    }
+  ]
+}
