@@ -1,0 +1,410 @@
+{
+  "name": "Market Research - Data Collection",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.apify.com/v2/datasets/YOUR_DATASET_ID/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Fetch Apify Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "YOUR_APIFY_CREDENTIAL_ID",
+          "name": "Apify API Token"
+        }
+      },
+      "notes": "⚠️ CONFIGURE THIS:\n1. Replace YOUR_DATASET_ID with your Apify dataset ID\n2. Set up Apify credential with token as query parameter\n3. Start with limit=10 for testing\n4. Remove limit for full production runs"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO market_executions (search_query, apify_dataset_id, status)\nVALUES (\n  COALESCE((SELECT json_array_elements(to_json($1::json))->>'searchString' LIMIT 1), 'Manual execution'),\n  'YOUR_DATASET_ID',\n  'running'\n)\nRETURNING id;",
+        "options": {}
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Start Execution",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [700, 300],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Market Research DB"
+        }
+      },
+      "notes": "Creates new execution record in market_executions table.\nStatus = 'running' until workflow completes."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "exec-id-001",
+              "name": "execution_id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-0123-def0-123456789013",
+      "name": "Store Execution ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [920, 300],
+      "notes": "Stores execution_id for use in all downstream nodes.\nReference with: $('Store Execution ID').first().json.execution_id"
+    },
+    {
+      "parameters": {
+        "content": "## 🔌 CONNECT YOUR EXISTING ETL NODES HERE\n\n**What to connect:**\n1. Connect output from 'Fetch Apify Data' to your existing ETL pipeline\n2. Keep ALL your existing Code nodes (Overview, Contact, Social, etc.)\n3. Keep ALL your existing Merge nodes\n\n**What to modify in your Code nodes:**\n```javascript\n// At the top of EACH Code node, add:\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\n// In your return statement, add execution_id:\nreturn items.map(item => {\n  return {\n    json: {\n      execution_id: executionId,  // ADD THIS\n      // ... rest of your existing fields\n    }\n  };\n});\n```\n\n**Then connect your final merged output to 'Combine Business Data' node below.**",
+        "height": 464.3482428115016,
+        "width": 389.3687707641196,
+        "color": 4
+      },
+      "id": "e5f6a7b8-c9d0-1234-ef01-234567890134",
+      "name": "STICKY: ETL Connection Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1140, 140]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine All Business Dimensions for Postgres JSONB storage\n// This consolidates Overview, Contact, Social, Rating, PopularTimes, Tags, Lead Enrichment\n// into a single business_data JSONB object\n\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\n// IMPORTANT: Replace these node names with YOUR actual node names from ETL pipeline\n// These are typical names - adjust based on your workflow\nconst getNodeData = (nodeName) => {\n  try {\n    return $input.all().find(item => item.json[nodeName])?.[nodeName] || {};\n  } catch {\n    return {};\n  }\n};\n\n// Process all items from merged ETL output\nconst results = [];\n\nfor (const item of $input.all()) {\n  const d = item.json;\n  \n  // Extract key identifiers\n  const businessName = d.title || d.name || 'Unknown Business';\n  const placeId = d.url || d.placeId || `${businessName}-${Date.now()}`;\n  const searchString = d.searchString || d.search || '';\n  \n  // Build comprehensive business_data JSONB object\n  const businessData = {\n    // Overview dimension\n    overview: {\n      title: d.title,\n      category: d.categoryName || d.category,\n      address: d.address,\n      city: d.city,\n      state: d.state,\n      zip: d.zip,\n      country: d.country || 'USA',\n      location: d.location,\n      latitude: d.location?.lat,\n      longitude: d.location?.lng,\n      url: d.url,\n      searchString: searchString\n    },\n    \n    // Contact dimension\n    contact: {\n      phone: d.phone || d.phoneNumber,\n      website: d.website,\n      email: d.email,\n      addressComponents: d.addressComponents\n    },\n    \n    // Social dimension\n    social: {\n      instagrams: d.instagrams,\n      facebooks: d.facebooks,\n      twitters: d.twitters,\n      linkedins: d.linkedins,\n      youtubes: d.youtubes,\n      social_media: d.social_media\n    },\n    \n    // Rating dimension\n    rating: {\n      totalScore: d.totalScore,\n      reviewsCount: d.reviewsCount,\n      rating: d.rating,\n      reviews_count: d.reviews?.length || 0\n    },\n    \n    // Popular times dimension\n    popular_times: {\n      popularTimesHistogram: d.popularTimesHistogram,\n      openingHours: d.openingHours,\n      peopleAlsoSearch: d.peopleAlsoSearch\n    },\n    \n    // Tags dimension\n    tags: {\n      additionalInfo: d.additionalInfo,\n      placesTags: d.placesTags,\n      categoryTags: d.categoryTags\n    },\n    \n    // Lead enrichment dimension\n    lead_enrichment: {\n      claimedBy: d.claimedBy,\n      verificationDetails: d.verificationDetails,\n      temporarilyClosed: d.temporarilyClosed,\n      permanentlyClosed: d.permanentlyClosed\n    },\n    \n    // Metadata\n    scraped_at: new Date().toISOString(),\n    apify_place_id: placeId\n  };\n  \n  results.push({\n    json: {\n      execution_id: executionId,\n      business_name: businessName,\n      search_string: searchString,\n      apify_place_id: placeId,\n      business_data: businessData\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "f6a7b8c9-d0e1-2345-f012-345678901345",
+      "name": "Combine Business Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 300],
+      "notes": "Merges all business dimensions into single JSONB object.\nModify the getNodeData() calls to match YOUR node names."
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "businesses",
+          "mode": "list",
+          "cachedResultName": "businesses"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{ $json.execution_id }}",
+            "business_name": "={{ $json.business_name }}",
+            "search_string": "={{ $json.search_string }}",
+            "apify_place_id": "={{ $json.apify_place_id }}",
+            "business_data": "={{ JSON.stringify($json.business_data) }}"
+          },
+          "matchingColumns": [
+            "apify_place_id"
+          ],
+          "schema": [
+            {
+              "id": "apify_place_id",
+              "displayName": "apify_place_id",
+              "required": true,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "business_name",
+              "displayName": "business_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "search_string",
+              "displayName": "search_string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "business_data",
+              "displayName": "business_data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {
+          "queryBatching": "transaction"
+        }
+      },
+      "id": "a7b8c9d0-e1f2-3456-0123-456789012346",
+      "name": "Upsert Business",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1800, 300],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Market Research DB"
+        }
+      },
+      "notes": "UPSERT = INSERT or UPDATE if apify_place_id exists.\nPrevents duplicate businesses when re-running same search.\nReturns business.id for reviews to reference."
+    },
+    {
+      "parameters": {
+        "content": "## ⚠️ IMPORTANT: Business ID Capture\n\nThe Upsert Business node returns the database ID.\n\n**This ID is needed for:**\n- Linking reviews to businesses\n- Foreign key relationship\n\n**The next Code node will:**\n1. Get original Apify data (with reviews array)\n2. Get business_id from this Upsert node\n3. Flatten all reviews with business_id reference\n4. Prepare for batch INSERT",
+        "height": 318.0730897009967,
+        "width": 339.8671096345515,
+        "color": 5
+      },
+      "id": "b8c9d0e1-f2a3-4567-1234-567890123457",
+      "name": "STICKY: Business ID Usage",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2020, 140]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare Reviews for Postgres Batch Insert\n// Flattens reviews from Apify data and links to business_id from Upsert node\n\nconst results = [];\n\n// Get original Apify data (before transformation)\nconst apifyData = $('Fetch Apify Data').all();\n\n// Get business records just inserted/updated\nconst businesses = $('Upsert Business').all();\n\n// Create lookup map: apify_place_id -> business database id\nconst businessIdMap = new Map();\nfor (const biz of businesses) {\n  const placeId = biz.json.apify_place_id;\n  const dbId = biz.json.id;\n  if (placeId && dbId) {\n    businessIdMap.set(placeId, dbId);\n  }\n}\n\n// Process each place from Apify data\nfor (const place of apifyData) {\n  const p = place.json;\n  \n  // Get business_id from our map\n  const placeId = p.url || p.placeId;\n  const businessId = businessIdMap.get(placeId);\n  \n  if (!businessId) {\n    console.log(`Warning: No business_id found for ${p.title} (${placeId})`);\n    continue;\n  }\n  \n  // Check if reviews exist\n  if (!Array.isArray(p.reviews) || p.reviews.length === 0) {\n    console.log(`No reviews for ${p.title}`);\n    continue;\n  }\n  \n  // Flatten all reviews for this business\n  for (const review of p.reviews) {\n    results.push({\n      json: {\n        business_id: businessId,\n        review_data: JSON.stringify({\n          // Business context\n          placeName: p.title,\n          placeId: placeId,\n          \n          // Reviewer info\n          reviewerId: review.reviewerId,\n          reviewerUrl: review.reviewerUrl,\n          reviewerName: review.name,\n          reviewerNumberOfReviews: review.reviewerNumberOfReviews,\n          reviewerProfilePhotoUrl: review.profilePhotoUrl,\n          isLocalGuide: review.isLocalGuide,\n          \n          // Review content\n          stars: review.stars,\n          text: review.text,\n          textTranslated: review.textTranslated,\n          \n          // Metadata\n          publishAt: review.publishAt,\n          publishedAtDate: review.publishedAtDate,\n          likesCount: review.likesCount,\n          \n          // Review identifiers\n          reviewId: review.reviewId,\n          reviewUrl: review.reviewUrl,\n          \n          // Media\n          reviewImageUrls: review.reviewImageUrls,\n          reviewImageUrl: review.reviewImageUrl,\n          \n          // Owner response\n          responseFromOwnerDate: review.responseFromOwnerDate,\n          responseFromOwnerText: review.responseFromOwnerText,\n          responseFromOwnerAgo: review.responseFromOwnerAgo\n        })\n      }\n    });\n  }\n}\n\nconsole.log(`Prepared ${results.length} reviews for ${businessIdMap.size} businesses`);\nreturn results;"
+      },
+      "id": "c9d0e1f2-a3b4-5678-2345-678901234568",
+      "name": "Prepare Reviews for Insert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2020, 300],
+      "notes": "Gets reviews from original Apify data.\nLinks each review to business_id from Upsert node.\nFlattens all reviews into array ready for batch insert."
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "business_reviews",
+          "mode": "list",
+          "cachedResultName": "business_reviews"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "business_id": "={{ $json.business_id }}",
+            "review_data": "={{ $json.review_data }}"
+          },
+          "schema": [
+            {
+              "id": "business_id",
+              "displayName": "business_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "review_data",
+              "displayName": "review_data",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {
+          "queryBatching": "transaction"
+        }
+      },
+      "id": "d0e1f2a3-b4c5-6789-3456-789012345679",
+      "name": "Insert Reviews Batch",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2240, 300],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Market Research DB"
+        }
+      },
+      "notes": "Batch INSERT with transaction.\nAll reviews succeed or all fail together.\n500 reviews = 1 transaction (atomic operation)."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE market_executions\nSET status = 'completed',\n    completed_at = NOW()\nWHERE id = {{ $('Store Execution ID').first().json.execution_id }};",
+        "options": {}
+      },
+      "id": "e1f2a3b4-c5d6-7890-4567-890123456780",
+      "name": "Complete Execution",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2460, 300],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "Market Research DB"
+        }
+      },
+      "notes": "Marks execution as 'completed'.\nTotal counts auto-updated by triggers in schema."
+    },
+    {
+      "parameters": {
+        "content": "## 🎉 Workflow Complete!\n\n**What just happened:**\n1. ✅ Created execution record\n2. ✅ Fetched Apify data (10 businesses for testing)\n3. ✅ Transformed through your ETL pipeline\n4. ✅ Upserted businesses to Postgres (JSONB)\n5. ✅ Inserted reviews with foreign key relationship\n6. ✅ Marked execution complete\n\n**Next steps:**\n1. Verify data in Supabase Studio\n2. Run test queries from Issue #2\n3. Remove limit=10 for full dataset\n4. Monitor execution times\n\n**Triggers automatically updated:**\n- market_executions.total_businesses\n- market_executions.total_reviews\n\n**Check results:**\n```sql\nSELECT * FROM recent_executions;\n```",
+        "height": 502.5830258302585,
+        "width": 347.16309012875526,
+        "color": 6
+      },
+      "id": "f2a3b4c5-d6e7-8901-5678-901234567891",
+      "name": "STICKY: Success Message",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2680, 140]
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Fetch Apify Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Apify Data": {
+      "main": [
+        [
+          {
+            "node": "Start Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Execution": {
+      "main": [
+        [
+          {
+            "node": "Store Execution ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Execution ID": {
+      "main": [
+        [
+          {
+            "node": "Combine Business Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Business Data": {
+      "main": [
+        [
+          {
+            "node": "Upsert Business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Business": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reviews for Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reviews for Insert": {
+      "main": [
+        [
+          {
+            "node": "Insert Reviews Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Reviews Batch": {
+      "main": [
+        [
+          {
+            "node": "Complete Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-11T00:00:00.000Z",
+  "versionId": "1"
+}
