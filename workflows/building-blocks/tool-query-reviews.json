@@ -1,0 +1,67 @@
+{
+  "name": "Tool - Query Reviews",
+  "nodes": [
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool to search and analyze customer reviews. Supports full-text search for finding reviews mentioning specific keywords or themes.\n\nTable schema:\n- business_id (INT) - Foreign key to businesses table\n- reviewer_name (TEXT) - Name of reviewer\n- stars (INT) - Rating given (1-5)\n- review_text (TEXT) - Full review content (full-text searchable)\n- published_at (DATE) - When review was posted\n- review_data (JSONB) - Complete review object\n\nCommon query patterns:\n\nFind reviews mentioning keyword (full-text search):\nSELECT b.business_name, r.review_text, r.stars \nFROM business_reviews r \nJOIN businesses b ON b.id = r.business_id \nWHERE to_tsvector('english', r.review_text) @@ to_tsquery('parking & problem') \nORDER BY r.stars LIMIT 20;\n\nFind negative reviews for specific business:\nSELECT reviewer_name, stars, review_text, published_at \nFROM business_reviews \nWHERE business_id = (SELECT id FROM businesses WHERE business_name ILIKE '%business name%') \nAND stars <= 2 \nORDER BY published_at DESC;\n\nReview sentiment analysis by category:\nSELECT b.category, \n  AVG(r.stars) as avg_stars, \n  COUNT(r.id) as review_count, \n  COUNT(CASE WHEN r.stars <= 2 THEN 1 END) as negative_reviews \nFROM business_reviews r \nJOIN businesses b ON b.id = r.business_id \nWHERE b.city = 'Phoenix' \nGROUP BY b.category \nORDER BY negative_reviews DESC;\n\nFind common complaint themes:\nSELECT b.business_name, \n  COUNT(*) as complaint_count, \n  string_agg(r.review_text, ' | ') as sample_complaints \nFROM business_reviews r \nJOIN businesses b ON b.id = r.business_id \nWHERE r.stars <= 2 AND r.review_text ILIKE '%your keyword%' \nGROUP BY b.business_name \nHAVING COUNT(*) > 3;\n\nRecent positive reviews:\nSELECT b.business_name, r.reviewer_name, r.stars, r.review_text, r.published_at \nFROM business_reviews r \nJOIN businesses b ON b.id = r.business_id \nWHERE r.stars >= 4 AND r.published_at > CURRENT_DATE - INTERVAL '90 days' \nORDER BY r.published_at DESC LIMIT 20;\n\nFull-text search operators:\n- & = AND (both words must appear)\n- | = OR (either word)\n- ! = NOT (exclude word)\n- <-> = words must be adjacent\n\nExample: to_tsquery('coffee & (bad | terrible) & !service') finds reviews with \"coffee\" AND (\"bad\" OR \"terrible\") but NOT \"service\"\n\nALWAYS join with businesses table to get business_name for context. Limit results to 20-50 for readability.",
+        "operation": "executeQuery",
+        "query": "={{ $fromAI('sql_query') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        380,
+        240
+      ],
+      "id": "query-reviews-tool",
+      "name": "Query Reviews Tool",
+      "credentials": {
+        "postgres": {
+          "name": "Market Research DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Query Reviews Tool\n\n**Purpose:** Analyze customer sentiment and find review patterns\n\n**When to use:**\n- \"What are customers saying about [topic]?\"\n- \"Find negative reviews mentioning [keyword]\"\n- \"Analyze complaints for [category]\"\n- \"What's the most common complaint?\"\n\n**Key features:**\n- Full-text search with `to_tsvector` and `to_tsquery`\n- Sentiment analysis (grouping by stars)\n- Pattern recognition across reviews\n- Time-based filtering (recent reviews)\n\n**Full-text search examples:**\n- `to_tsquery('parking')` - Find \"parking\"\n- `to_tsquery('parking & problem')` - Both words\n- `to_tsquery('bad | terrible')` - Either word\n- `to_tsquery('coffee & !service')` - \"coffee\" but NOT \"service\"\n\n**Always joins with businesses table** for context (business name, city, category)\n\n**Example conversation:**\nYou: \"What are customers complaining about in auto repair shops?\"\nAI: [Uses this tool with full-text search]\n    \"Analyzed 234 negative reviews. Top complaints:\n     1. Overcharging (34%)\n     2. Unnecessary repairs (28%)\n     3. Poor communication (21%)...\"\n\n**Based on:** Cole Medin's RAG pattern + Postgres full-text search",
+        "height": 587.5502008032129,
+        "width": 442.3277459477904,
+        "color": 4
+      },
+      "id": "sticky-note-docs-reviews",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        20
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "market-research-rag"
+  },
+  "tags": [
+    {
+      "name": "ai-tool",
+      "id": "tool-query-reviews"
+    },
+    {
+      "name": "postgres",
+      "id": "postgres-tool"
+    },
+    {
+      "name": "full-text-search",
+      "id": "fts"
+    }
+  ]
+}

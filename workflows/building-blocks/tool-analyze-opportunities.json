@@ -1,0 +1,67 @@
+{
+  "name": "Tool - Analyze Opportunities",
+  "nodes": [
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool for complex analytical queries to identify market opportunities, trends, and newsletter ideas. This tool is for aggregations, statistical analysis, and multi-table joins.\n\nUse cases:\n1. Find underserved markets (high demand, low supply)\n2. Identify businesses with engagement gaps (high reviews but low social presence)\n3. Discover newsletter opportunities (categories with trust issues)\n4. Analyze competitive landscapes\n\nExample analytical queries:\n\nUnderserved opportunities (high rating, low competition):\nSELECT city, category, \n  COUNT(*) as business_count, \n  ROUND(AVG(rating), 2) as avg_rating, \n  SUM(review_count) as total_reviews \nFROM businesses \nWHERE rating > 4.5 \nGROUP BY city, category \nHAVING COUNT(*) < 5 AND SUM(review_count) > 100 \nORDER BY total_reviews DESC;\n\nCategories with trust issues (many reviews, low ratings):\nSELECT category, \n  COUNT(*) as business_count, \n  ROUND(AVG(rating), 2) as avg_rating, \n  SUM(review_count) as total_reviews \nFROM businesses \nGROUP BY category \nHAVING AVG(rating) < 4.0 AND SUM(review_count) > 500 \nORDER BY avg_rating ASC;\n\nSocial media engagement gaps:\nSELECT b.business_name, b.city, b.rating, b.review_count, \n  CASE WHEN b.business_data->'social' ? 'instagrams' THEN 'Yes' ELSE 'No' END as has_instagram \nFROM businesses b \nWHERE b.rating > 4.5 AND b.review_count > 50 \nAND (b.business_data->'social'->>'instagrams' IS NULL OR b.business_data->'social'->>'instagrams' = '') \nORDER BY b.review_count DESC LIMIT 20;\n\nNewsletter opportunity analysis:\nWITH category_stats AS (\n  SELECT b.category, \n    COUNT(*) as biz_count, \n    AVG(b.rating) as avg_rating, \n    COUNT(r.id) FILTER (WHERE r.stars <= 2) as negative_reviews, \n    COUNT(r.id) as total_stored_reviews \n  FROM businesses b \n  LEFT JOIN business_reviews r ON r.business_id = b.id \n  GROUP BY b.category\n)\nSELECT category, biz_count, \n  ROUND(avg_rating, 2) as avg_rating, \n  negative_reviews, \n  ROUND(100.0 * negative_reviews / NULLIF(total_stored_reviews, 0), 1) as negative_pct \nFROM category_stats \nWHERE biz_count > 5 \nORDER BY negative_pct DESC LIMIT 10;\n\nMarket density by city and category:\nSELECT city, category, \n  COUNT(*) as business_count, \n  ROUND(AVG(rating), 2) as avg_rating, \n  ROUND(AVG(review_count), 0) as avg_reviews, \n  SUM(review_count) as total_market_reviews \nFROM businesses \nGROUP BY city, category \nHAVING COUNT(*) >= 3 \nORDER BY city, total_market_reviews DESC;\n\nCompetitive landscape (top performers vs market average):\nWITH market_avg AS (\n  SELECT category, AVG(rating) as market_avg_rating \n  FROM businesses \n  WHERE city = 'Phoenix' \n  GROUP BY category\n)\nSELECT b.business_name, b.category, b.rating, b.review_count, \n  ROUND(b.rating - m.market_avg_rating, 2) as rating_vs_market \nFROM businesses b \nJOIN market_avg m ON b.category = m.category \nWHERE b.city = 'Phoenix' AND b.rating > m.market_avg_rating + 0.3 \nORDER BY rating_vs_market DESC;\n\nTime-based trends (if you have multiple executions):\nSELECT e.search_query, e.created_at::date as execution_date, \n  COUNT(b.id) as businesses_found, \n  AVG(b.rating) as avg_rating \nFROM market_executions e \nJOIN businesses b ON b.execution_id = e.id \nGROUP BY e.search_query, e.created_at::date \nORDER BY e.created_at DESC;\n\nUse CTEs (WITH clauses) for complex multi-step analysis. Always provide context with your results (don't just return numbers, explain what they mean for newsletter opportunities or market insights).",
+        "operation": "executeQuery",
+        "query": "={{ $fromAI('sql_query') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        380,
+        240
+      ],
+      "id": "analyze-opportunities-tool",
+      "name": "Analyze Opportunities Tool",
+      "credentials": {
+        "postgres": {
+          "name": "Market Research DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Analyze Opportunities Tool\n\n**Purpose:** Complex analytical queries for market insights and newsletter opportunities\n\n**When to use:**\n- \"Find newsletter opportunities\"\n- \"What are underserved markets?\"\n- \"Analyze competitive landscape\"\n- \"Find engagement gaps\"\n- \"What categories have trust issues?\"\n\n**Analytical patterns:**\n1. **Underserved markets:** High ratings + low competition\n2. **Trust issues:** Many reviews + low ratings = need for curation\n3. **Engagement gaps:** High reviews + no social media\n4. **Competitive analysis:** Business vs market averages\n5. **Trend analysis:** Time-based patterns\n\n**SQL techniques used:**\n- CTEs (WITH clauses) for multi-step analysis\n- Window functions (FILTER, PARTITION BY)\n- Statistical aggregations (AVG, STDDEV, percentiles)\n- Complex JOINs across all tables\n\n**Newsletter opportunity formula:**\nHigh Review Volume + Low Ratings + High Search Intent = Newsletter Opportunity\n\n**Example conversation:**\nYou: \"What are the best newsletter opportunities?\"\nAI: [Uses this tool with CTE query]\n    \"Found 3 strong opportunities:\n     1. Auto Repair - 52 businesses, 3.9 avg rating, 34% mention overcharging\n     2. Home Services - 87 businesses, 4.3 rating, communication issues\n     3. Pet Services - Only 23 businesses (underserved), 4.6 rating\"\n\n**Why separate from query_businesses:**\n- Different mental model (analysis vs lookup)\n- More complex SQL (CTEs, statistical functions)\n- Encourages AI to think analytically\n- Provides market context, not just data\n\n**Based on:** Cole Medin's pattern + analytical SQL techniques",
+        "height": 687.5502008032129,
+        "width": 442.3277459477904,
+        "color": 4
+      },
+      "id": "sticky-note-docs-opportunities",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -20
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "market-research-rag"
+  },
+  "tags": [
+    {
+      "name": "ai-tool",
+      "id": "tool-analyze-opportunities"
+    },
+    {
+      "name": "postgres",
+      "id": "postgres-tool"
+    },
+    {
+      "name": "analytics",
+      "id": "analytics"
+    }
+  ]
+}
