@@ -1,0 +1,252 @@
+{
+  "name": "Market Research - RAG Chat Interface",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "options": {
+          "loadPreviousSession": true
+        }
+      },
+      "id": "chat-trigger-1",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "market-research-chat"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "chat-input-1",
+              "name": "chatInput",
+              "value": "={{ $json?.chatInput || $json.body.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "session-id-1",
+              "name": "sessionId",
+              "value": "={{ $json?.sessionId || $json.body.sessionId}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "edit-fields-1",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "You are a market research analyst assistant with access to local business data from Google Maps (scraped via Apify).\n\nYour knowledge base contains:\n- Business profiles (name, location, category, ratings, contact info, social media)\n- Customer reviews with full text and ratings\n- Popular times and traffic patterns\n- Data stored in Postgres with JSONB columns\n\nAvailable tools:\n1. query_businesses - Search/filter businesses by city, category, rating, review count, or any JSONB field\n2. query_reviews - Analyze customer reviews for sentiment, keywords, patterns\n3. analyze_opportunities - Identify underserved markets, high-potential niches\n\nJSON structure you're querying:\n- businesses.business_data contains: overview, contact, social, rating, popular_times, tags\n- Use JSONB operators: ->, ->>, @>, ?, ?&, ?| for nested queries\n- Generated columns available: city, category, rating, review_count\n\nALWAYS:\n- Write SQL queries yourself - you have full query capabilities\n- Cite specific business names and numbers in your answers\n- Identify patterns across multiple businesses\n- Quantify opportunities (X businesses, avg Y rating, Z reviews)\n- When analyzing reviews, look for recurring themes\n- If no data found, say so clearly (don't make things up)\n\nNEVER:\n- Fabricate data\n- Ignore low-rated businesses (they reveal market gaps)\n- Give generic advice without data backing\n\nExample queries you can write:\n- Find opportunities: SELECT * FROM businesses WHERE rating > 4.5 AND review_count < 20\n- Category analysis: SELECT category, COUNT(*), AVG(rating) FROM businesses GROUP BY category\n- Review search: SELECT b.business_name, r.review_text FROM business_reviews r JOIN businesses b ON b.id = r.business_id WHERE to_tsvector('english', r.review_text) @@ to_tsquery('parking')\n- JSONB queries: SELECT business_name FROM businesses WHERE business_data->'social' ? 'instagram'\n\nYou're here to help discover newsletter opportunities, market gaps, and customer insights."
+        }
+      },
+      "id": "rag-ai-agent",
+      "name": "Market Research AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "openai-chat-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "OpenAI Market Research"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId }}",
+        "contextWindowLength": 10
+      },
+      "id": "postgres-chat-memory",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1,
+      "position": [
+        400,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "name": "Market Research DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## RAG Chat Interface for Market Research\n\n**Pattern:** Cole Medin's RAG AI Agent Template V5\n**Model:** gpt-4o-mini (fast & cost-effective)\n**Temperature:** 0.3 (consistent SQL generation)\n\n**Flow:**\n1. User sends message via chat interface\n2. Edit Fields extracts chatInput + sessionId\n3. AI Agent processes with system prompt\n4. Postgres Memory maintains conversation context\n5. Response sent back to chat interface\n\n**Tool Connections (Added in Issue #4):**\n- Query Businesses Tool (basic SELECT)\n- Query Reviews Tool (full-text search)\n- Analyze Opportunities Tool (aggregations)\n\nEach tool connects to AI Agent via ai_tool port",
+        "height": 500,
+        "width": 400,
+        "color": 4
+      },
+      "id": "sticky-note-1",
+      "name": "Architecture Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## System Prompt Features\n\n✓ Market research analyst persona\n✓ Knows JSONB structure of business_data\n✓ Understands tools available (query_businesses, query_reviews, analyze_opportunities)\n✓ Examples of SQL queries it can write\n✓ Emphasis on quantification & patterns\n✓ Clear instructions: cite sources, don't fabricate\n\n**Upgrade to GPT-4o if:**\n- SQL queries have syntax errors\n- Agent needs better reasoning\n- More creative newsletter ideas needed\n\nCurrent model (gpt-4o-mini) is good for 95% of use cases",
+        "height": 400,
+        "width": 400,
+        "color": 5
+      },
+      "id": "sticky-note-2",
+      "name": "System Prompt Design",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        600,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Chat Memory Configuration\n\n**Type:** Postgres-backed (persistent)\n**Session Key:** {{ $json.sessionId }}\n**Context Window:** 10 messages\n\n**Auto-creates table:** n8n_chat_histories\n\n**Enables:**\n- Multi-turn conversations\n- Follow-up questions (\"Show me more\")\n- Context awareness (\"What about Phoenix?\")\n\n**Session isolation:**\n- Different browsers = different sessionIds\n- No cross-contamination of conversations\n- When using as API, pass consistent sessionId per user",
+        "height": 400,
+        "width": 400,
+        "color": 6
+      },
+      "id": "sticky-note-3",
+      "name": "Memory System",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Tool Connections (Issue #4)\n\nPlaceholder connections for:\n\n1️⃣ Query Businesses Tool\n   - Basic SELECT queries\n   - Filter by city, category, rating\n   - JSONB field access\n\n2️⃣ Query Reviews Tool\n   - Full-text search with to_tsvector\n   - Sentiment analysis\n   - Pattern detection\n\n3️⃣ Analyze Opportunities Tool\n   - Complex aggregations (GROUP BY, AVG, COUNT)\n   - Market gap identification\n   - Newsletter idea generation\n\nEach tool will connect to AI Agent via ai_tool port\n\n⚠️ Until Issue #4 complete, AI can only chat (no data access)",
+        "height": 500,
+        "width": 400,
+        "color": 3
+      },
+      "id": "sticky-note-4",
+      "name": "Tool Placeholders",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -200
+      ]
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Market Research AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Market Research AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Market Research AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Market Research AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-11T00:00:00.000Z",
+  "versionId": "market-research-rag-chat-v1"
+}
