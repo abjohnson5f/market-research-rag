@@ -1,0 +1,846 @@
+{
+  "name": "Market Research - Data Collection",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "url": "https://api.apify.com/v2/datasets/YOUR_DATASET_ID/items?token=YOUR_APIFY_TOKEN&limit=10",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ],
+      "id": "b2c3d4e5-f6a7-4b5c-9d0e-1f2a3b4c5d6e",
+      "name": "Fetch Apify Data"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "market_executions",
+          "mode": "list",
+          "cachedResultName": "market_executions"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "search_query": "={{ $json[0]?.searchString || 'Manual execution' }}",
+            "apify_dataset_id": "YOUR_DATASET_ID",
+            "status": "running"
+          }
+        },
+        "options": {
+          "queryBatching": "off"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        680,
+        300
+      ],
+      "id": "c3d4e5f6-a7b8-4c5d-0e1f-2a3b4c5d6e7f",
+      "name": "Start Execution",
+      "credentials": {
+        "postgres": {
+          "name": "Market Research DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "execution-id",
+              "name": "execution_id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        900,
+        300
+      ],
+      "id": "d4e5f6a7-b8c9-4d5e-1f2a-3b4c5d6e7f8a",
+      "name": "Store Execution ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Overview Code node\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\nreturn items.map(item => {\n  const d = item.json;\n\n  return {\n    json: {\n      execution_id: executionId,\n      title: d.title || null,\n      category: d.categoryName || null,\n      searchString: d.searchString || null,\n      url: d.url || null,\n      city: d.city || null,\n      state: d.state || null,\n      street: d.street || null,\n      postalCode: d.postalCode || null,\n      countryCode: d.countryCode || null,\n      plusCode: d.plusCode || null,\n      isAdvertisement: d.isAdvertisement || false,\n      rank: d.rank || null,\n      searchPageUrl: d.searchPageUrl || null,\n      totalScore: d.totalScore || null,\n      reviewsCount: d.reviewsCount || null,\n      reviewsDistribution: d.reviewsDistribution || null,\n      website: d.website || null,\n      phone: d.phone || null,\n      temporarilyClosed: d.temporarilyClosed || false,\n      permanentlyClosed: d.permanentlyClosed || false\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        180
+      ],
+      "id": "e5f6a7b8-c9d0-4e5f-2a3b-4c5d6e7f8a9b",
+      "name": "Overview"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Contact Code node\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\nreturn items.map(item => {\n  const d = item.json;\n\n  return {\n    json: {\n      execution_id: executionId,\n      title: d.title || null,\n      url: d.url || null,\n      phone: d.phone || null,\n      phoneUnformatted: d.phoneUnformatted || null,\n      website: d.website || null,\n      email: d.email || null,\n      claimThisBusiness: d.claimThisBusiness || false,\n      menu: d.menu || null\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ],
+      "id": "f6a7b8c9-d0e1-4f5a-3b4c-5d6e7f8a9b0c",
+      "name": "Contact"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Social Code node\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\nreturn items.map(item => {\n  const d = item.json;\n\n  return {\n    json: {\n      execution_id: executionId,\n      title: d.title || null,\n      url: d.url || null,\n      facebookPages: d.facebookPages || null,\n      instagrams: d.instagrams || null,\n      twitters: d.twitters || null,\n      linkedIns: d.linkedIns || null,\n      pinterests: d.pinterests || null,\n      youtubes: d.youtubes || null\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        420
+      ],
+      "id": "a7b8c9d0-e1f2-4a5b-4c5d-6e7f8a9b0c1d",
+      "name": "Social"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rating Code node\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\nreturn items.map(item => {\n  const d = item.json;\n\n  return {\n    json: {\n      execution_id: executionId,\n      title: d.title || null,\n      url: d.url || null,\n      totalScore: d.totalScore || null,\n      reviewsCount: d.reviewsCount || null,\n      reviewsDistribution: d.reviewsDistribution || null\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        540
+      ],
+      "id": "b8c9d0e1-f2a3-4b5c-5d6e-7f8a9b0c1d2e",
+      "name": "Rating"
+    },
+    {
+      "parameters": {
+        "jsCode": "// popularTimesHistogram Code node\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\nreturn items.map(item => {\n  const d = item.json;\n\n  return {\n    json: {\n      execution_id: executionId,\n      title: d.title || null,\n      url: d.url || null,\n      searchString: d.searchString || null,\n      popularTimesHistogram: d.popularTimesHistogram || null\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        660
+      ],
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "popularTimesHistogram"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tags Code node\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\nreturn items.map(item => {\n  const d = item.json;\n\n  return {\n    json: {\n      execution_id: executionId,\n      title: d.title || null,\n      url: d.url || null,\n      tags: d.tags || null\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        780
+      ],
+      "id": "d0e1f2a3-b4c5-4d5e-7f8a-9b0c1d2e3f4a",
+      "name": "Tags"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lead enrichment Code node\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\nreturn items.map(item => {\n  const d = item.json;\n\n  return {\n    json: {\n      execution_id: executionId,\n      title: d.title || null,\n      url: d.url || null,\n      gadId: d.gadId || null,\n      placeId: d.placeId || null,\n      cid: d.cid || null,\n      dataId: d.dataId || null,\n      price: d.price || null,\n      location: d.location || null,\n      totalScore: d.totalScore || null,\n      reviewsCount: d.reviewsCount || null\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        900
+      ],
+      "id": "e1f2a3b4-c5d6-4e5f-8a9b-0c1d2e3f4a5b",
+      "name": "Lead enrichment"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        1340,
+        180
+      ],
+      "id": "f2a3b4c5-d6e7-4f5a-9b0c-1d2e3f4a5b6c",
+      "name": "Merge Overview+Contact"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        1560,
+        240
+      ],
+      "id": "a3b4c5d6-e7f8-4a5b-0c1d-2e3f4a5b6c7d",
+      "name": "Merge +Social"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        300
+      ],
+      "id": "b4c5d6e7-f8a9-4b5c-1d2e-3f4a5b6c7d8e",
+      "name": "Merge +Rating"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        2000,
+        360
+      ],
+      "id": "c5d6e7f8-a9b0-4c5d-2e3f-4a5b6c7d8e9f",
+      "name": "Merge +PopularTimes"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        2220,
+        420
+      ],
+      "id": "d6e7f8a9-b0c1-4d5e-3f4a-5b6c7d8e9f0a",
+      "name": "Merge +Tags"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        2440,
+        480
+      ],
+      "id": "e7f8a9b0-c1d2-4e5f-4a5b-6c7d8e9f0a1b",
+      "name": "Merge +LeadEnrichment"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine All Business Dimensions for Postgres\n// This merges Overview, Contact, Social, Rating, PopularTimes into single JSONB object\n\nconst executionId = $('Store Execution ID').first().json.execution_id;\n\n// Get data from merged upstream nodes\nreturn items.map(item => {\n  const d = item.json;\n  \n  return {\n    json: {\n      execution_id: executionId,\n      business_name: d.title || 'Unknown',\n      search_string: d.searchString || null,\n      apify_place_id: d.url || `${d.title}-${Date.now()}`,\n\n      // Single JSONB object with all dimensions\n      business_data: {\n        overview: {\n          title: d.title,\n          category: d.categoryName,\n          searchString: d.searchString,\n          url: d.url,\n          city: d.city,\n          state: d.state,\n          street: d.street,\n          postalCode: d.postalCode,\n          countryCode: d.countryCode,\n          plusCode: d.plusCode,\n          isAdvertisement: d.isAdvertisement,\n          rank: d.rank,\n          searchPageUrl: d.searchPageUrl,\n          temporarilyClosed: d.temporarilyClosed,\n          permanentlyClosed: d.permanentlyClosed\n        },\n        contact: {\n          phone: d.phone,\n          phoneUnformatted: d.phoneUnformatted,\n          website: d.website,\n          email: d.email,\n          claimThisBusiness: d.claimThisBusiness,\n          menu: d.menu\n        },\n        social: {\n          facebookPages: d.facebookPages,\n          instagrams: d.instagrams,\n          twitters: d.twitters,\n          linkedIns: d.linkedIns,\n          pinterests: d.pinterests,\n          youtubes: d.youtubes\n        },\n        rating: {\n          totalScore: d.totalScore,\n          reviewsCount: d.reviewsCount,\n          reviewsDistribution: d.reviewsDistribution\n        },\n        popular_times: {\n          popularTimesHistogram: d.popularTimesHistogram\n        },\n        tags: d.tags || [],\n        lead_enrichment: {\n          gadId: d.gadId,\n          placeId: d.placeId,\n          cid: d.cid,\n          dataId: d.dataId,\n          price: d.price,\n          location: d.location\n        },\n        scraped_at: new Date().toISOString()\n      }\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        480
+      ],
+      "id": "f8a9b0c1-d2e3-4f5a-5b6c-7d8e9f0a1b2c",
+      "name": "Combine Business Data"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "businesses",
+          "mode": "list",
+          "cachedResultName": "businesses"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{ $('Store Execution ID').first().json.execution_id }}",
+            "business_name": "={{ $json.business_name }}",
+            "search_string": "={{ $json.search_string }}",
+            "apify_place_id": "={{ $json.apify_place_id }}",
+            "business_data": "={{ JSON.stringify($json.business_data) }}"
+          },
+          "matchingColumns": [
+            "apify_place_id"
+          ],
+          "schema": [
+            {
+              "id": "apify_place_id",
+              "displayName": "apify_place_id",
+              "required": true,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "business_name",
+              "displayName": "business_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "search_string",
+              "displayName": "search_string",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "business_data",
+              "displayName": "business_data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "queryBatching": "transaction"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2880,
+        480
+      ],
+      "id": "a9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d",
+      "name": "Upsert Business",
+      "credentials": {
+        "postgres": {
+          "name": "Market Research DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare Reviews for Postgres Insert\n// Flattens reviews from all places + adds business_id reference\n\nconst executionId = $('Store Execution ID').first().json.execution_id;\nconst results = [];\n\nfor (const item of items) {\n  const p = item.json;\n\n  // Get business_id from Upsert Business node\n  const businessRecord = $('Upsert Business').all().find(b =>\n    b.json.business_name === p.title ||\n    b.json.apify_place_id === p.url\n  );\n\n  const businessId = businessRecord?.json.id;\n\n  if (!businessId) {\n    console.log(`Warning: No business_id found for ${p.title}`);\n    continue;\n  }\n\n  // Ensure reviews exist\n  if (Array.isArray(p.reviews) && p.reviews.length > 0) {\n    for (const r of p.reviews) {\n      results.push({\n        json: {\n          business_id: businessId,\n          // Store entire review as JSONB\n          review_data: JSON.stringify({\n            placeName: p.title,\n            reviewerId: r.reviewerId,\n            reviewerUrl: r.reviewerUrl,\n            reviewerName: r.name,\n            reviewerNumberOfReviews: r.reviewerNumberOfReviews,\n            isLocalGuide: r.isLocalGuide,\n            stars: r.stars,\n            text: r.text,\n            textTranslated: r.textTranslated,\n            publishAt: r.publishAt,\n            publishedAtDate: r.publishedAtDate,\n            likesCount: r.likesCount,\n            reviewId: r.reviewId,\n            reviewUrl: r.reviewUrl,\n            reviewImageUrls: r.reviewImageUrls,\n            responseFromOwnerDate: r.responseFromOwnerDate,\n            responseFromOwnerText: r.responseFromOwnerText\n          })\n        }\n      });\n    }\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3100,
+        480
+      ],
+      "id": "b0c1d2e3-f4a5-4b5c-7d8e-9f0a1b2c3d4e",
+      "name": "Prepare Reviews for Insert"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "business_reviews",
+          "mode": "list",
+          "cachedResultName": "business_reviews"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "business_id": "={{ $json.business_id }}",
+            "review_data": "={{ $json.review_data }}"
+          },
+          "schema": [
+            {
+              "id": "business_id",
+              "displayName": "business_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false,
+              "removed": false
+            },
+            {
+              "id": "review_data",
+              "displayName": "review_data",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "queryBatching": "transaction"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3320,
+        480
+      ],
+      "id": "c1d2e3f4-a5b6-4c5d-8e9f-0a1b2c3d4e5f",
+      "name": "Insert Reviews Batch",
+      "credentials": {
+        "postgres": {
+          "name": "Market Research DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "market_executions",
+          "mode": "list"
+        },
+        "updateKey": "id",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Store Execution ID').first().json.execution_id }}",
+            "status": "completed",
+            "completed_at": "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3540,
+        480
+      ],
+      "id": "d2e3f4a5-b6c7-4d5e-9f0a-1b2c3d4e5f6a",
+      "name": "Complete Execution",
+      "credentials": {
+        "postgres": {
+          "name": "Market Research DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 📋 Data Collection Workflow\n\n**Purpose:** Fetch Google Maps business data from Apify and store in Postgres with JSONB\n\n**Flow:**\n1. Manual trigger starts workflow\n2. Fetch Apify dataset (limit=10 for testing)\n3. Track execution in market_executions table\n4. Transform data through 31 Code nodes\n5. Merge dimensions with 29 Merge nodes\n6. Upsert businesses (prevents duplicates)\n7. Insert reviews in batch transaction\n8. Mark execution complete\n\n**Key Features:**\n- ✅ JSONB storage (no JSON parsing needed)\n- ✅ Idempotent upserts (same business won't duplicate)\n- ✅ Atomic review inserts (all or nothing)\n- ✅ Execution tracking for auditing",
+        "height": 419.07513541775103,
+        "width": 389.63949520766803,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        140,
+        80
+      ],
+      "id": "e3f4a5b6-c7d8-4e5f-0a1b-2c3d4e5f6a7b",
+      "name": "Workflow Overview"
+    },
+    {
+      "parameters": {
+        "content": "## ⚙️ ETL Layer (31 Code Nodes)\n\n**These nodes transform raw Apify data:**\n\nThis workflow uses 7 main transformation nodes:\n- Overview (location, category, status)\n- Contact (phone, email, website)\n- Social (Instagram, Facebook, etc.)\n- Rating (score, review count)\n- popularTimesHistogram (busy times)\n- Tags (business attributes)\n- Lead enrichment (IDs, pricing)\n\n**Note:** Original workflow had 31 Code nodes.\nThis simplified version shows the pattern.\nAdd your custom transformations here.\n\n**Each node adds execution_id for tracking**",
+        "height": 420.34539092827264,
+        "width": 388.85107709750564,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1020,
+        40
+      ],
+      "id": "f4a5b6c7-d8e9-4f5a-1b2c-3d4e5f6a7b8c",
+      "name": "ETL Transformations"
+    },
+    {
+      "parameters": {
+        "content": "## 🔄 Merge Layer (29 Nodes)\n\n**Combines data dimensions:**\n\nMerges happen sequentially:\n1. Overview + Contact\n2. Result + Social\n3. Result + Rating\n4. Result + PopularTimes\n5. Result + Tags\n6. Result + LeadEnrichment\n\n**Why merge?**\nEach Code node processes ONE dimension.\nMerge nodes combine them into complete business record.\n\n**Final output:** Single item with all fields",
+        "height": 381.03754266211604,
+        "width": 388.85107709750564,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1240,
+        1060
+      ],
+      "id": "a5b6c7d8-e9f0-4a5b-2c3d-4e5f6a7b8c9d",
+      "name": "Merge Strategy"
+    },
+    {
+      "parameters": {
+        "content": "## 💾 Postgres Layer\n\n**Replaces 19 Google Sheets nodes**\n\n**3 Postgres operations:**\n\n1. **Start Execution** (INSERT)\n   - Creates tracking record\n   - Status: 'running'\n\n2. **Upsert Business** (INSERT/UPDATE)\n   - If apify_place_id exists → UPDATE\n   - If new → INSERT\n   - Prevents duplicates on re-runs\n\n3. **Insert Reviews Batch** (INSERT)\n   - All reviews in single transaction\n   - If 500 reviews, all succeed or all fail\n   - 10-100x faster than individual inserts\n\n4. **Complete Execution** (UPDATE)\n   - Status: 'completed'\n   - Timestamp: now()",
+        "height": 501.73593073593086,
+        "width": 388.85107709750564,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2760,
+        1060
+      ],
+      "id": "b6c7d8e9-f0a1-4b5c-3d4e-5f6a7b8c9d0e",
+      "name": "Postgres Operations"
+    },
+    {
+      "parameters": {
+        "content": "## 🧪 Testing Checklist\n\n**Before running full dataset:**\n\n✅ Verify URL has limit=10\n✅ Test Postgres credential connection\n✅ Check all Code nodes reference 'Store Execution ID'\n✅ Verify building blocks are connected\n\n**After first successful run:**\n\n✅ Query market_executions table\n✅ Verify 10 businesses inserted\n✅ Check JSONB structure\n✅ Verify reviews linked to businesses\n✅ Test full-text search on reviews\n\n**Production:**\n\n✅ Remove limit=10 from Apify URL\n✅ Monitor execution time (2-3 min expected)\n✅ Check for duplicate businesses (should be 0)\n✅ Verify all reviews inserted",
+        "height": 501.73593073593086,
+        "width": 388.85107709750564,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3420,
+        1060
+      ],
+      "id": "c7d8e9f0-a1b2-4c5d-4e5f-6a7b8c9d0e1f",
+      "name": "Testing Guide"
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Fetch Apify Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Apify Data": {
+      "main": [
+        [
+          {
+            "node": "Start Execution",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Overview",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Contact",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Social",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Rating",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "popularTimesHistogram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tags",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Lead enrichment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Reviews for Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Execution": {
+      "main": [
+        [
+          {
+            "node": "Store Execution ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Overview": {
+      "main": [
+        [
+          {
+            "node": "Merge Overview+Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact": {
+      "main": [
+        [
+          {
+            "node": "Merge Overview+Contact",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Social": {
+      "main": [
+        [
+          {
+            "node": "Merge +Social",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Rating": {
+      "main": [
+        [
+          {
+            "node": "Merge +Rating",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "popularTimesHistogram": {
+      "main": [
+        [
+          {
+            "node": "Merge +PopularTimes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Tags": {
+      "main": [
+        [
+          {
+            "node": "Merge +Tags",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Lead enrichment": {
+      "main": [
+        [
+          {
+            "node": "Merge +LeadEnrichment",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Overview+Contact": {
+      "main": [
+        [
+          {
+            "node": "Merge +Social",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge +Social": {
+      "main": [
+        [
+          {
+            "node": "Merge +Rating",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge +Rating": {
+      "main": [
+        [
+          {
+            "node": "Merge +PopularTimes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge +PopularTimes": {
+      "main": [
+        [
+          {
+            "node": "Merge +Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge +Tags": {
+      "main": [
+        [
+          {
+            "node": "Merge +LeadEnrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge +LeadEnrichment": {
+      "main": [
+        [
+          {
+            "node": "Combine Business Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Business Data": {
+      "main": [
+        [
+          {
+            "node": "Upsert Business",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Business": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reviews for Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reviews for Insert": {
+      "main": [
+        [
+          {
+            "node": "Insert Reviews Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Reviews Batch": {
+      "main": [
+        [
+          {
+            "node": "Complete Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-10-12T00:00:00.000Z",
+  "versionId": "1"
+}

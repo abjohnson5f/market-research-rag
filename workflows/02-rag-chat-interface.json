@@ -1,0 +1,143 @@
+{
+  "name": "Market Research - RAG Chat",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "options": {
+          "loadPreviousSession": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        340
+      ],
+      "id": "chat-trigger-1",
+      "name": "When chat message received",
+      "webhookId": ""
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "You are a market research analyst assistant with access to local business data from Google Maps (scraped via Apify).\n\nYour knowledge base contains:\n- Business profiles (name, location, category, ratings, contact info, social media)\n- Customer reviews with full text and ratings\n- Popular times and traffic patterns\n- Data stored in Postgres with JSONB columns\n\nAvailable tools:\n1. query_businesses - Search/filter businesses by city, category, rating, review_count, or any JSONB field\n2. query_reviews - Analyze customer reviews for sentiment, keywords, patterns\n3. analyze_opportunities - Identify underserved markets, high-potential niches\n\nJSON structure you're querying:\n- businesses.business_data contains: overview, contact, social, rating, popular_times, tags\n- Use JSONB operators: ->, ->>, @>, ?, ?&, ?| for nested queries\n- Generated columns available: city, category, rating, review_count\n\nALWAYS:\n- Write SQL queries yourself - you have full query capabilities\n- Cite specific business names and numbers in your answers\n- Identify patterns across multiple businesses\n- Quantify opportunities (X businesses, avg Y rating, Z reviews)\n- When analyzing reviews, look for recurring themes\n- If no data found, say so clearly (don't make things up)\n\nNEVER:\n- Fabricate data\n- Ignore low-rated businesses (they reveal market gaps)\n- Give generic advice without data backing\n\nExample queries you can write:\n- Find opportunities: SELECT * FROM businesses WHERE rating > 4.5 AND review_count < 20\n- Category analysis: SELECT category, COUNT(*), AVG(rating) FROM businesses GROUP BY category\n- Review search: SELECT b.business_name, r.review_text FROM business_reviews r JOIN businesses b ON b.id = r.business_id WHERE to_tsvector('english', r.review_text) @@ to_tsquery('parking')\n- JSONB queries: SELECT business_name FROM businesses WHERE business_data->'social' ? 'instagrams'\n\nYou're here to help discover newsletter opportunities, market gaps, and customer insights."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        680,
+        340
+      ],
+      "id": "rag-ai-agent",
+      "name": "Market Research AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        900,
+        520
+      ],
+      "id": "openai-chat-model",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "name": "OpenAI Market Research"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1,
+      "position": [
+        900,
+        340
+      ],
+      "id": "postgres-chat-memory",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "name": "Market Research DB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Market Research AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Market Research AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Market Research AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-10-12T00:00:00.000Z",
+      "updatedAt": "2025-10-12T00:00:00.000Z",
+      "id": "market-research",
+      "name": "market-research"
+    },
+    {
+      "createdAt": "2025-10-12T00:00:00.000Z",
+      "updatedAt": "2025-10-12T00:00:00.000Z",
+      "id": "rag",
+      "name": "rag"
+    },
+    {
+      "createdAt": "2025-10-12T00:00:00.000Z",
+      "updatedAt": "2025-10-12T00:00:00.000Z",
+      "id": "ai-agent",
+      "name": "ai-agent"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-12T00:00:00.000Z",
+  "versionId": "1"
+}

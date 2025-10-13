@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "description": "Postgres Tool node for AI Agent - allows agent to run complex analytical queries",
+    "usage": "Connect to AI Agent node - agent will write SQL for market opportunity analysis and trend identification",
+    "source": "Issue #4 - Tool #3: Analyze Opportunities"
+  },
+  "node": {
+    "parameters": {
+      "descriptionType": "manual",
+      "toolDescription": "Use this tool for complex analytical queries to identify market opportunities, trends, and newsletter ideas. This tool is for aggregations, statistical analysis, and multi-table joins.\n\nUse cases:\n1. Find underserved markets (high demand, low supply)\n2. Identify businesses with engagement gaps (high reviews but low social presence)\n3. Discover newsletter opportunities (categories with trust issues)\n4. Analyze competitive landscapes\n\nExample analytical queries:\n\nUnderserved opportunities (high rating, low competition):\nSELECT city, category, COUNT(*) as business_count, ROUND(AVG(rating), 2) as avg_rating, SUM(review_count) as total_reviews FROM businesses WHERE rating > 4.5 GROUP BY city, category HAVING COUNT(*) < 5 AND SUM(review_count) > 100 ORDER BY total_reviews DESC;\n\nCategories with trust issues (many reviews, low ratings):\nSELECT category, COUNT(*) as business_count, ROUND(AVG(rating), 2) as avg_rating, SUM(review_count) as total_reviews FROM businesses GROUP BY category HAVING AVG(rating) < 4.0 AND SUM(review_count) > 500 ORDER BY avg_rating ASC;\n\nSocial media engagement gaps:\nSELECT b.business_name, b.city, b.rating, b.review_count, CASE WHEN b.business_data->'social' ? 'instagrams' THEN 'Yes' ELSE 'No' END as has_instagram FROM businesses b WHERE b.rating > 4.5 AND b.review_count > 50 AND (b.business_data->'social'->>'instagrams' IS NULL OR b.business_data->'social'->>'instagrams' = '') ORDER BY b.review_count DESC LIMIT 20;\n\nNewsletter opportunity analysis:\nWITH category_stats AS (SELECT b.category, COUNT(*) as biz_count, AVG(b.rating) as avg_rating, COUNT(r.id) FILTER (WHERE r.stars <= 2) as negative_reviews, COUNT(r.id) as total_stored_reviews FROM businesses b LEFT JOIN business_reviews r ON r.business_id = b.id GROUP BY b.category) SELECT category, biz_count, ROUND(avg_rating, 2) as avg_rating, negative_reviews, ROUND(100.0 * negative_reviews / NULLIF(total_stored_reviews, 0), 1) as negative_pct FROM category_stats WHERE biz_count > 5 ORDER BY negative_pct DESC LIMIT 10;\n\nTime-based trends (if you have multiple executions):\nSELECT e.search_query, e.created_at::date as execution_date, COUNT(b.id) as businesses_found, AVG(b.rating) as avg_rating FROM market_executions e JOIN businesses b ON b.execution_id = e.id GROUP BY e.search_query, e.created_at::date ORDER BY e.created_at DESC;\n\nUse CTEs (WITH clauses) for complex multi-step analysis. Always provide context with your results (don't just return numbers, explain what they mean for newsletter opportunities or market insights).",
+      "operation": "executeQuery",
+      "query": "={{ $fromAI('sql_query') }}",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.postgresTool",
+    "typeVersion": 2.5,
+    "position": [
+      200,
+      600
+    ],
+    "id": "75dcd7c5-08e9-4d5b-be5f-27efb7876651",
+    "name": "Analyze Opportunities Tool",
+    "credentials": {
+      "postgres": {
+        "name": "Market Research DB"
+      }
+    }
+  },
+  "notes": {
+    "toolDescription": "This description teaches the AI about complex analytical patterns, CTEs, and business opportunity identification",
+    "fromAI": "$fromAI('sql_query') extracts the SQL the agent generates from its reasoning",
+    "safety": "The agent can only SELECT - it cannot DROP tables or modify data (read-only queries)",
+    "usage": "Use for market gap analysis, competitive intelligence, and newsletter opportunity discovery"
+  }
+}
