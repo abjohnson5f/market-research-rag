@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "description": "MCP Client node to add business data to Graphiti knowledge graph",
+    "usage": "Connect after 'Combine Business Data' node - sends business entity to graph",
+    "source": "Adapted from Cole Medin RAG Template V5"
+  },
+  "node": {
+    "parameters": {
+      "connectionType": "sse",
+      "operation": "executeTool",
+      "toolName": "add_memory",
+      "toolParameters": "={\n  \"name\": {{ JSON.stringify($json.business_name) }},\n  \"episode_body\": {{ JSON.stringify(\n    'Business: ' + $json.business_name + '\\n' +\n    'Category: ' + ($json.business_data.overview.category || 'Unknown') + '\\n' +\n    'City: ' + ($json.business_data.overview.city || 'Unknown') + '\\n' +\n    'State: ' + ($json.business_data.overview.state || 'Unknown') + '\\n' +\n    'Rating: ' + ($json.business_data.rating.totalScore || 'N/A') + '\\n' +\n    'Reviews: ' + ($json.business_data.rating.reviewsCount || '0') + '\\n' +\n    'Phone: ' + ($json.business_data.contact.phone || 'N/A') + '\\n' +\n    'Website: ' + ($json.business_data.contact.website || 'N/A') + '\\n' +\n    'Address: ' + ($json.business_data.overview.address || 'N/A') + '\\n' +\n    'Social Media: Instagram=' + ($json.business_data.social.instagrams || 'none') +\n      ', Facebook=' + ($json.business_data.social.facebooks || 'none')\n  ) }}\n}"
+    },
+    "type": "n8n-nodes-mcp.mcpClient",
+    "typeVersion": 1,
+    "position": [1200, 400],
+    "id": "graphiti-add-business-kg",
+    "name": "Add Business to Knowledge Graph",
+    "credentials": {
+      "mcpClientSseApi": {
+        "name": "Graphiti Knowledge Graph"
+      }
+    }
+  },
+  "notes": {
+    "what_it_does": "Sends business entity to Graphiti for automatic entity extraction and relationship creation",
+    "entities_extracted": "Business name, category, location (city/state), rating, contact info, social media",
+    "relationships_created": "Business->LOCATED_IN->City, Business->IN_CATEGORY->Category, Business->HAS_RATING->RatingScore",
+    "no_code_required": "Graphiti handles entity resolution and duplicate merging automatically"
+  }
+}
