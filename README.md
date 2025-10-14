@@ -2,7 +2,7 @@
 
 > **Transform local business data from Apify into an AI-powered market intelligence assistant**
 
-This repository contains n8n workflows and database schemas to replace Google Sheets-based market research analysis with a RAG (Retrieval-Augmented Generation) chat interface powered by Postgres/Supabase.
+This repository contains n8n workflows and database schemas to replace Google Sheets-based market research analysis with a RAG (Retrieval-Augmented Generation) chat interface powered by Postgres/Supabase and Neo4j knowledge graph.
 
 ## 🎯 What This Does
 
@@ -12,16 +12,18 @@ Instead of:
 - ❌ Static, pre-generated insights
 
 You get:
-- ✅ Clean data pipeline (Apify → Postgres)
+- ✅ Clean data pipeline (Apify → Postgres + Knowledge Graph)
 - ✅ Interactive AI chat interface
 - ✅ On-demand market analysis
-- ✅ SQL-powered insights
+- ✅ SQL-powered insights + Entity resolution
 
 ## 🏗️ Architecture
 
 ### Data Collection Workflow
 ```
-Manual Trigger → Apify API → ETL (Code nodes) → Postgres (JSONB storage)
+Manual Trigger → Apify API → ETL (Code nodes) → Dual Write
+  ├─ Postgres (JSONB storage)
+  └─ Neo4j Knowledge Graph (Entity resolution)
 ```
 
 **What it stores:**
@@ -32,13 +34,15 @@ Manual Trigger → Apify API → ETL (Code nodes) → Postgres (JSONB storage)
 
 ### RAG Chat Interface
 ```
-User Question → AI Agent → Postgres Tools → SQL Queries → Natural Language Answer
+User Question → AI Agent → Hybrid Tools (SQL + Graph) → Analysis → Natural Language Answer
 ```
 
 **What you can ask:**
 - "What are the best opportunities for local newsletters in Phoenix?"
 - "Analyze reviews for auto repair shops - what are customers complaining about?"
-- "Generate 30 newsletter ideas for home services businesses"
+- "Is ABC Cooling the same as ABC Cooling & Heating Inc?" (Entity resolution)
+- "Find businesses similar to XYZ Company" (Semantic search)
+- "Best Phoenix HVAC businesses and their competitors" (Hybrid SQL + Graph)
 
 ## 📁 Repository Structure
 
@@ -47,6 +51,9 @@ market-research-rag/
 ├── workflows/
 │   ├── 01-data-collection.json          # Main ETL pipeline
 │   ├── 02-rag-chat-interface.json       # AI chat assistant
+│   ├── patches/                         # Workflow modification guides
+│   │   ├── 13-knowledge-graph-data-collection.json
+│   │   └── 13-knowledge-graph-rag-chat.json
 │   └── building-blocks/                 # Reusable node templates
 │       ├── postgres-create-table.json
 │       ├── postgres-upsert.json
@@ -59,7 +66,11 @@ market-research-rag/
 ├── docs/
 │   ├── SETUP.md                         # Installation guide
 │   ├── MIGRATION.md                     # From Google Sheets
-│   └── QUERIES.md                       # Example SQL queries
+│   ├── QUERIES.md                       # Example SQL queries
+│   ├── KNOWLEDGE-GRAPH-SETUP.md         # Knowledge graph integration
+│   ├── KNOWLEDGE-GRAPH-TESTING.md       # Testing procedures
+│   ├── ARCHITECTURE.md                  # System architecture diagrams
+│   └── IMPLEMENTATION-CHECKLIST-13.md   # Implementation validation
 └── README.md                            # This file
 ```
 
@@ -70,6 +81,7 @@ market-research-rag/
 - Postgres/Supabase database
 - Apify account with Google Maps Scraper
 - OpenAI API key (for embeddings and chat)
+- **Optional:** Neo4j + Graphiti MCP for knowledge graph features
 
 ### Installation
 
@@ -112,6 +124,64 @@ See [docs/SETUP.md](docs/SETUP.md) for detailed instructions.
 
 See [schema/01-tables.sql](schema/01-tables.sql) for complete DDL.
 
+## 🧠 Knowledge Graph Layer
+
+In addition to SQL-based analysis, this system includes an optional knowledge graph layer for:
+
+- **Entity Resolution**: Identify duplicate businesses across sources ("Is ABC Cooling same as ABC Cooling Inc?")
+- **Semantic Search**: Find businesses similar to a specific company
+- **Relationship Discovery**: Connect businesses by complaint patterns, service areas, or supply chains
+- **Multi-Source Integration**: Link permit data, PDFs, and Apify records into unified entities
+
+### Architecture
+
+```
+Data Collection → Dual Write
+  ├─ Postgres (SQL queries, aggregations, exact filters)
+  └─ Neo4j Knowledge Graph (entity resolution, semantic search)
+
+AI Agent Tools:
+  ├─ query_businesses (SQL) - Exact filters
+  ├─ query_reviews (SQL) - Text search
+  ├─ analyze_opportunities (SQL) - Pre-computed views
+  └─ search_knowledge_graph (Graph) - Entity resolution ← NEW
+```
+
+### Getting Started with Knowledge Graph
+
+**Prerequisites:**
+- Neo4j database (Desktop or AuraDB)
+- Graphiti MCP server running
+- n8n workflows updated with dual-write capability
+
+**Setup:**
+1. Follow [docs/KNOWLEDGE-GRAPH-SETUP.md](docs/KNOWLEDGE-GRAPH-SETUP.md) for complete instructions
+2. Test with [docs/KNOWLEDGE-GRAPH-TESTING.md](docs/KNOWLEDGE-GRAPH-TESTING.md)
+3. Validate with [docs/IMPLEMENTATION-CHECKLIST-13.md](docs/IMPLEMENTATION-CHECKLIST-13.md)
+
+**Key Features:**
+- **Dual-write pipeline**: Data flows to both Postgres and Neo4j
+- **Graceful degradation**: Postgres write succeeds even if graph unavailable
+- **Hybrid queries**: AI Agent automatically chooses SQL vs Graph based on query type
+- **Entity resolution**: Detect duplicate businesses with different name variations
+
+**Example Queries:**
+```
+# Entity Resolution
+"Is ABC Cooling the same as ABC Cooling & Heating Inc?"
+
+# Semantic Search
+"Find businesses similar to XYZ Plumbing"
+
+# Hybrid Analysis
+"Best Phoenix HVAC businesses and their competitors"
+→ Step 1 (SQL): Filter Phoenix HVAC, rating > 4.5
+→ Step 2 (Graph): Find similar entities for each
+→ Step 3: Synthesize competitive landscape
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed system architecture.
+
 ## 🎓 Inspired By
 
 This architecture is based on **Cole Medin's RAG AI Agent Template V5**, adapting his patterns for market research:
@@ -125,6 +195,7 @@ This architecture is based on **Cole Medin's RAG AI Agent Template V5**, adaptin
 - Optimized for business/review data (not documents)
 - Batch processing for Apify datasets
 - Market-specific analysis tools
+- Knowledge graph integration for entity resolution
 
 ## 📝 GitHub Issues
 
@@ -135,6 +206,8 @@ Implementation is broken down into digestible issues:
 3. **RAG Chat Interface** - Set up AI agent and chat trigger
 4. **Postgres Tool Nodes** - Create SQL query tools for agent
 5. **Testing & Validation** - Verify end-to-end functionality
+6-12. **Intelligence Layer** - SQL views for market analysis
+13. **Knowledge Graph Integration** - Entity resolution layer ← NEW
 
 Each issue includes:
 - Complete node JSON (copy-paste ready)
@@ -152,4 +225,4 @@ MIT
 
 ---
 
-**Built with:** n8n • Postgres/Supabase • OpenAI • Apify
+**Built with:** n8n • Postgres/Supabase • Neo4j • Graphiti • OpenAI • Apify

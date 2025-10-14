@@ -1,0 +1,170 @@
+{
+  "patch_description": "Knowledge Graph Integration - Data Collection Workflow Additions",
+  "patch_version": "1.0.0",
+  "target_workflow": "01-data-collection.json",
+  "instructions": "Add these nodes to enable dual-write to Postgres + Neo4j knowledge graph",
+  
+  "nodes_to_add": [
+    {
+      "node_name": "Split: Dual Write Path",
+      "insert_after": "Combine Business Data",
+      "configuration": {
+        "parameters": {
+          "mode": "batch",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitOut",
+        "typeVersion": 1,
+        "position": [2700, 480],
+        "id": "split-dual-write-kg",
+        "name": "Split: Dual Write Path"
+      },
+      "notes": "Splits data flow into two parallel paths: Postgres (existing) and Knowledge Graph (new)"
+    },
+    
+    {
+      "node_name": "Prepare Graph Entity",
+      "insert_after": "Split: Dual Write Path",
+      "connection_from": "Split: Dual Write Path (output 2)",
+      "configuration": {
+        "parameters": {
+          "jsCode": "// Transform business data for knowledge graph entity\nconst businessData = $json.business_data;\n\nreturn {\n  json: {\n    ...$json, // Pass through all existing fields\n    graph_entity: {\n      name: $json.business_name,\n      type: \"Business\",\n      attributes: {\n        // Unique identifiers\n        apify_place_id: $json.apify_place_id,\n        place_url: businessData.overview?.url,\n\n        // Core business info\n        category: businessData.overview?.category,\n        city: businessData.overview?.city,\n        state: businessData.overview?.state,\n        address: `${businessData.overview?.street || ''}, ${businessData.overview?.city || ''}, ${businessData.overview?.state || ''}`.trim(),\n        postal_code: businessData.overview?.postalCode,\n\n        // Contact\n        phone: businessData.contact?.phone,\n        website: businessData.contact?.website,\n        email: businessData.contact?.email,\n\n        // Metrics\n        rating: businessData.rating?.totalScore,\n        review_count: businessData.rating?.reviewsCount,\n\n        // Status\n        is_advertisement: businessData.overview?.isAdvertisement,\n        temporarily_closed: businessData.overview?.temporarilyClosed,\n        permanently_closed: businessData.overview?.permanentlyClosed,\n\n        // Metadata\n        search_string: $json.search_string,\n        execution_id: $json.execution_id,\n        last_updated: new Date().toISOString()\n      },\n\n      // Optional: Define relationships for graph\n      relationships: [\n        {\n          type: \"LOCATED_IN\",\n          target_entity: {\n            type: \"City\",\n            name: businessData.overview?.city || \"Unknown\"\n          }\n        },\n        {\n          type: \"BELONGS_TO_CATEGORY\",\n          target_entity: {\n            type: \"BusinessCategory\",\n            name: businessData.overview?.category || \"Uncategorized\"\n          }\n        }\n      ]\n    }\n  }\n};"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [2900, 360],
+        "id": "prepare-graph-entity-kg",
+        "name": "Prepare Graph Entity"
+      },
+      "notes": "Transforms JSONB business data into knowledge graph entity format with attributes and relationships"
+    },
+    
+    {
+      "node_name": "Write to Knowledge Graph",
+      "insert_after": "Prepare Graph Entity",
+      "configuration": {
+        "parameters": {
+          "method": "POST",
+          "url": "http://localhost:3000/graphiti/entities",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.graph_entity) }}",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            },
+            "retry": {
+              "retry": {
+                "maxTries": 3,
+                "waitBetweenTries": 1000
+              }
+            }
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [3100, 360],
+        "id": "write-kg-http",
+        "name": "Write to Knowledge Graph",
+        "continueOnFail": true
+      },
+      "notes": "HTTP POST to Graphiti MCP server. Continue On Fail enabled so Postgres write succeeds even if graph write fails.",
+      "important": "CRITICAL: Enable 'Continue On Fail' in node settings to ensure Postgres write succeeds even if graph is unavailable"
+    },
+    
+    {
+      "node_name": "Merge: After Dual Write",
+      "insert_after": "Write to Knowledge Graph",
+      "configuration": {
+        "parameters": {
+          "mode": "combine",
+          "combinationMode": "mergeByPosition",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 2.1,
+        "position": [3300, 480],
+        "id": "merge-after-dual-write-kg",
+        "name": "Merge: After Dual Write"
+      },
+      "notes": "Recombines Postgres and Knowledge Graph paths before continuing to review insertion"
+    }
+  ],
+  
+  "connections_to_update": {
+    "old_connection": {
+      "from": "Combine Business Data",
+      "to": "Upsert Business"
+    },
+    "new_connections": [
+      {
+        "from": "Combine Business Data",
+        "to": "Split: Dual Write Path",
+        "output": "main",
+        "input": 0
+      },
+      {
+        "from": "Split: Dual Write Path",
+        "to": "Upsert Business",
+        "output": "main",
+        "output_index": 0,
+        "input": 0,
+        "note": "Path 1: SQL write to Postgres"
+      },
+      {
+        "from": "Split: Dual Write Path",
+        "to": "Prepare Graph Entity",
+        "output": "main",
+        "output_index": 1,
+        "input": 0,
+        "note": "Path 2: Graph write to Neo4j"
+      },
+      {
+        "from": "Prepare Graph Entity",
+        "to": "Write to Knowledge Graph",
+        "output": "main",
+        "input": 0
+      },
+      {
+        "from": "Upsert Business",
+        "to": "Merge: After Dual Write",
+        "output": "main",
+        "input": 0
+      },
+      {
+        "from": "Write to Knowledge Graph",
+        "to": "Merge: After Dual Write",
+        "output": "main",
+        "input": 1
+      },
+      {
+        "from": "Merge: After Dual Write",
+        "to": "Prepare Reviews for Insert",
+        "output": "main",
+        "input": 0
+      }
+    ]
+  },
+  
+  "visual_flow": {
+    "ascii_diagram": "[Combine Business Data]\n        |\n        v\n[Split: Dual Write Path]\n        |\n    +---+---+\n    v       v\n[Upsert   [Prepare Graph Entity]\nBusiness]      |\n    |     [Write to Knowledge Graph]\n    |          |\n    +-----+----+\n          |\n          v\n[Merge: After Dual Write]\n          |\n          v\n[Prepare Reviews for Insert]"
+  },
+  
+  "testing_instructions": {
+    "step_1": "Save workflow after adding nodes",
+    "step_2": "Verify Graphiti MCP server is running: curl http://localhost:3000/health",
+    "step_3": "Set Apify URL limit=5 for quick test",
+    "step_4": "Execute workflow manually",
+    "step_5": "Check execution log - both 'Upsert Business' and 'Write to Knowledge Graph' should succeed",
+    "step_6": "Verify Postgres: SELECT COUNT(*) FROM businesses WHERE created_at > NOW() - INTERVAL '5 minutes';",
+    "step_7": "Verify Neo4j: MATCH (b:Business) WHERE b.last_updated >= datetime() - duration({minutes: 5}) RETURN count(b);",
+    "step_8": "Counts should match (5 businesses in both systems)"
+  },
+  
+  "rollback_instructions": {
+    "if_issues": "To rollback, simply delete the 4 new nodes and reconnect 'Combine Business Data' directly to 'Upsert Business'",
+    "data_integrity": "Existing Postgres data is unaffected. Only new executions will attempt dual-write."
+  }
+}
