@@ -472,7 +472,7 @@ current_supply AS (
   SELECT
     category,
     city,
-    service_keyword,
+    keyword as service_keyword,
     COUNT(DISTINCT b.id) as provider_count
   FROM businesses b
   CROSS JOIN LATERAL (
