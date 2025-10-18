@@ -120,13 +120,32 @@ CREATE TRIGGER update_businesses_updated_at
 -- ============================================================================
 -- Postgres 17+ requires immutable generated columns, but JSONB extraction is STABLE
 -- Solution: Use trigger to populate extracted columns on INSERT/UPDATE
+-- Includes defensive casting to handle malformed data gracefully
 CREATE OR REPLACE FUNCTION extract_review_fields()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- Extract reviewer name (safe - text always succeeds)
     NEW.reviewer_name := NEW.review_data->>'reviewerName';
-    NEW.stars := (NEW.review_data->>'stars')::int;
+
+    -- Extract stars with defensive casting (default to NULL if unparseable)
+    BEGIN
+        NEW.stars := (NEW.review_data->>'stars')::int;
+    EXCEPTION WHEN OTHERS THEN
+        NEW.stars := NULL;
+        RAISE WARNING 'Invalid stars value in review_data for review ID %: %', NEW.id, NEW.review_data->>'stars';
+    END;
+
+    -- Extract review text (safe - text always succeeds)
     NEW.review_text := NEW.review_data->>'text';
-    NEW.published_at := (NEW.review_data->>'publishedAtDate')::date;
+
+    -- Extract published date with defensive casting (default to NULL if unparseable)
+    BEGIN
+        NEW.published_at := (NEW.review_data->>'publishedAtDate')::date;
+    EXCEPTION WHEN OTHERS THEN
+        NEW.published_at := NULL;
+        RAISE WARNING 'Invalid date value in review_data for review ID %: %', NEW.id, NEW.review_data->>'publishedAtDate';
+    END;
+
     RETURN NEW;
 END;
 $$ language 'plpgsql';
