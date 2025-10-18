@@ -1,0 +1,91 @@
+name: Deploy to Neon Main Branch
+
+on:
+  workflow_dispatch:  # Manual trigger only - safety first
+  # Uncomment below to auto-deploy on main branch pushes
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'schema/**'
+
+jobs:
+  deploy:
+    name: Apply Migrations to Neon Main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Get Neon Main Branch Connection String
+        id: neon_connection
+        run: |
+          # Get main branch database URL from Neon API
+          MAIN_BRANCH_URL=$(curl -s \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/connection_uri?branch_id=main" \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Accept: application/json" | jq -r '.uri')
+
+          echo "Retrieved main branch connection string"
+          echo "::add-mask::$MAIN_BRANCH_URL"
+          echo "db_url=$MAIN_BRANCH_URL" >> $GITHUB_OUTPUT
+
+      - name: Run Database Migrations
+        env:
+          DATABASE_URL: ${{ steps.neon_connection.outputs.db_url }}
+        run: |
+          echo "Applying migrations to Neon main branch..."
+
+          # Migration 1: Create tables
+          psql "$DATABASE_URL" -f schema/01-tables.sql
+
+          # Migration 2: Create indexes
+          psql "$DATABASE_URL" -f schema/02-indexes.sql
+
+          # Migration 3: Create strategic views
+          psql "$DATABASE_URL" -f schema/03-strategic-views.sql
+
+          echo "✅ All migrations applied successfully"
+
+      - name: Validate Schema
+        env:
+          DATABASE_URL: ${{ steps.neon_connection.outputs.db_url }}
+        run: |
+          echo "Validating schema..."
+
+          # Count tables
+          TABLE_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('businesses', 'business_reviews', 'market_executions')")
+
+          # Count views
+          VIEW_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT count(*) FROM information_schema.views WHERE table_schema = 'public'")
+
+          echo "Tables created: $TABLE_COUNT (expected: 3)"
+          echo "Views created: $VIEW_COUNT (expected: 9)"
+
+          if [ "$TABLE_COUNT" -eq 3 ]; then
+            echo "✅ All tables created successfully"
+          else
+            echo "❌ Table creation failed"
+            exit 1
+          fi
+
+          if [ "$VIEW_COUNT" -ge 8 ]; then
+            echo "✅ Views created successfully"
+          else
+            echo "⚠️ Unexpected view count"
+          fi
+
+      - name: Summary
+        run: |
+          echo "🎉 Deployment to Neon main branch complete!"
+          echo "Next steps:"
+          echo "1. Import n8n workflows"
+          echo "2. Configure Neon credentials in n8n"
+          echo "3. Test data collection workflow"
