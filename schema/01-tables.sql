@@ -6,9 +6,11 @@
 --
 -- Design principles:
 -- 1. JSONB for semi-structured data (Apify schema changes frequently)
--- 2. Generated columns for common filters (city, rating, etc.)
--- 3. One-to-many relationships (business → reviews)
--- 4. Full-text search on review text
+-- 2. Generated columns for immutable extractions (city, rating on businesses table)
+-- 3. Trigger-populated columns for mutable extractions (stars, review_text on reviews table - Postgres 17 compatibility)
+-- 4. One-to-many relationships (business → reviews)
+-- 5. Full-text search on review text
+-- 6. Multi-layered data quality (defensive triggers + CHECK constraints)
 -- ============================================================================
 
 -- ============================================================================
@@ -150,7 +152,11 @@ BEGIN
         NEW.stars := (NEW.review_data->>'stars')::int;
     EXCEPTION WHEN OTHERS THEN
         NEW.stars := NULL;
-        RAISE WARNING 'Invalid stars value in review_data for review ID %: %', NEW.id, NEW.review_data->>'stars';
+        -- Note: NEW.id is NULL during BEFORE INSERT, so use reviewer/date for identification
+        RAISE WARNING 'Invalid stars value for reviewer "%" (published %): got "%"',
+            COALESCE(NEW.review_data->>'reviewerName', 'Unknown'),
+            COALESCE(NEW.review_data->>'publishedAtDate', 'unknown date'),
+            NEW.review_data->>'stars';
     END;
 
     -- Extract review text (safe - text always succeeds)
@@ -161,7 +167,10 @@ BEGIN
         NEW.published_at := (NEW.review_data->>'publishedAtDate')::date;
     EXCEPTION WHEN OTHERS THEN
         NEW.published_at := NULL;
-        RAISE WARNING 'Invalid date value in review_data for review ID %: %', NEW.id, NEW.review_data->>'publishedAtDate';
+        -- Note: NEW.id is NULL during BEFORE INSERT, so use reviewer for identification
+        RAISE WARNING 'Invalid date value for reviewer "%": got "%"',
+            COALESCE(NEW.review_data->>'reviewerName', 'Unknown'),
+            NEW.review_data->>'publishedAtDate';
     END;
 
     RETURN NEW;
