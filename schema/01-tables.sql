@@ -85,17 +85,23 @@ CREATE TABLE IF NOT EXISTS business_reviews (
     review_data JSONB NOT NULL,
 
     -- Extracted columns for filtering/sorting (not generated due to Postgres 17 immutability requirements)
+    -- Populated automatically by extract_review_fields() trigger (with defensive error handling)
     reviewer_name TEXT,
     stars INT,
     review_text TEXT,
     published_at DATE,
 
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    -- Data quality constraints: Validate stars is valid rating scale (NULL allowed for malformed data)
+    CONSTRAINT valid_stars_range CHECK (stars IS NULL OR stars BETWEEN 0 AND 5)
 );
 
 COMMENT ON TABLE business_reviews IS 'Individual customer reviews - one-to-many with businesses';
 COMMENT ON COLUMN business_reviews.review_data IS 'Full review object: text, stars, reviewer info, images, owner response, etc.';
-COMMENT ON COLUMN business_reviews.review_text IS 'Extracted for full-text search - stored as generated column';
+COMMENT ON COLUMN business_reviews.stars IS 'Rating (0-5 scale). NULL if malformed in source data. Analytics should use COALESCE(stars, 0) or filter WHERE stars IS NOT NULL.';
+COMMENT ON COLUMN business_reviews.review_text IS 'Extracted for full-text search - automatically populated by trigger';
+COMMENT ON COLUMN business_reviews.published_at IS 'Publication date. NULL if unparseable in source data.';
 
 
 -- ============================================================================
@@ -120,7 +126,19 @@ CREATE TRIGGER update_businesses_updated_at
 -- ============================================================================
 -- Postgres 17+ requires immutable generated columns, but JSONB extraction is STABLE
 -- Solution: Use trigger to populate extracted columns on INSERT/UPDATE
--- Includes defensive casting to handle malformed data gracefully
+--
+-- DATA QUALITY STRATEGY (Fail-Open with Validation):
+-- 1. Trigger: Defensive casting - malformed types become NULL (graceful degradation)
+-- 2. Constraint: Range validation - valid types but wrong values rejected (data integrity)
+-- 3. Result: Best of both worlds - resilient to API changes, strict on valid data
+--
+-- Example scenarios:
+--   stars: 5           → SUCCESS (valid integer, valid range)
+--   stars: "five"      → NULL (malformed type, trigger catches, logs warning)
+--   stars: 99          → REJECT (valid type, invalid range, constraint catches)
+--   stars: null        → NULL (missing data allowed, analytics handle gracefully)
+--
+-- Trade-off: NULL values in analytics require COALESCE/filtering, but system never crashes
 CREATE OR REPLACE FUNCTION extract_review_fields()
 RETURNS TRIGGER AS $$
 BEGIN
