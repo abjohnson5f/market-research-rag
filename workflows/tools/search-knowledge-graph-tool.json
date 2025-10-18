@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "description": "AI tool to search knowledge graph for entity relationships and semantic connections",
+    "usage": "Connect to AI Agent - enables graph-based reasoning over market data",
+    "source": "Adapted from Cole Medin RAG Template V5 - MCP Client Tool"
+  },
+  "node": {
+    "parameters": {
+      "connectionType": "sse",
+      "operation": "executeTool",
+      "toolName": "search_memory_nodes",
+      "toolDescription": "Use this tool to search the knowledge graph for entity relationships, similar businesses, or cross-source connections.\n\n**When to use this tool:**\n- Finding relationships between entities (\"businesses similar to ABC Cooling\")\n- Entity resolution (\"Is ABC Cooling the same as ABC Cooling & Heating Inc?\")\n- Multi-source queries (\"businesses mentioned in both permit data and Apify\")\n- Semantic search (\"HVAC contractors with high permit activity\")\n\n**Data sources in graph:**\n- Businesses from Apify (name, location, category, rating)\n- Reviews with sentiment (positive/negative themes)\n- External data when added (PDFs, URLs, Docs)\n\n**Example questions:**\n- \"What businesses are similar to XYZ Company?\"\n- \"Find HVAC contractors in Southwest cities with growing permit trends\"\n- \"Which businesses have both high ratings and negative parking complaints?\"\n- \"Show me entities mentioned in Phoenix permit data that match Apify businesses\"\n\n**How it works:**\nThe graph connects businesses by location, category, and sentiment themes. It automatically resolves entity variations (\"ABC Cooling\" vs \"ABC Cooling & Heating\").\n\nThis tool complements SQL tools:\n- Use SQL for exact filters (city='Phoenix', rating>4.5)\n- Use graph for relationships and similarities",
+      "toolParameters": "={\"query\": {{ JSON.stringify($fromAI('query')) }}}"
+    },
+    "type": "n8n-nodes-mcp.mcpClientTool",
+    "typeVersion": 1,
+    "position": [-128, 500],
+    "id": "search-kg-tool",
+    "name": "Search Knowledge Graph",
+    "credentials": {
+      "mcpClientSseApi": {
+        "name": "Graphiti Knowledge Graph"
+      }
+    }
+  },
+  "notes": {
+    "tool_type": "ai_tool",
+    "connects_to": "AI Agent node",
+    "what_ai_sends": "Natural language query like 'find businesses similar to ABC Cooling'",
+    "what_graphiti_returns": "Entity nodes and relationships in graph format",
+    "how_ai_uses_it": "AI converts graph results into natural language answer for user"
+  }
+}

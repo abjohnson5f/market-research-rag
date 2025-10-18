@@ -1,0 +1,134 @@
+{
+  "patch_description": "Knowledge Graph Integration - RAG Chat Interface Additions",
+  "patch_version": "1.0.0",
+  "target_workflow": "02-rag-chat-interface.json",
+  "instructions": "Add knowledge graph search tool to AI Agent for entity resolution and semantic search",
+  
+  "nodes_to_add": [
+    {
+      "node_name": "Tool: Knowledge Graph Search",
+      "configuration": {
+        "parameters": {
+          "name": "search_knowledge_graph",
+          "description": "Search the knowledge graph for entity resolution, semantic similarity, and relationship discovery.\n\nUse this tool when:\n- User asks about entity resolution (\"Is ABC same as ABC Inc?\")\n- User wants to find similar businesses (\"Find businesses like XYZ\")\n- User asks about relationships (\"What businesses have similar patterns?\")\n- Query involves semantic similarity or fuzzy matching\n\nDO NOT use for:\n- Exact filters (city, category, rating) → Use query_businesses instead\n- Review text search → Use query_reviews instead\n- Quantitative analysis → Use analyze_opportunities instead\n\nInput format:\n{\n  \"query_type\": \"entity_resolution\" | \"semantic_search\" | \"relationship_discovery\",\n  \"entity_name\": \"Business name to search\",\n  \"similarity_threshold\": 0.8,\n  \"limit\": 10\n}\n\nReturns: List of entities with similarity scores and relationships",
+          "method": "POST",
+          "url": "http://localhost:3000/graphiti/search",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($parameter.toolArguments) }}",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+        "typeVersion": 1.1,
+        "position": [900, 680],
+        "id": "tool-kg-search",
+        "name": "Tool: Knowledge Graph Search"
+      },
+      "notes": "LangChain tool for knowledge graph queries. AI Agent will automatically call this when entity resolution or semantic search is needed."
+    }
+  ],
+  
+  "connections_to_add": [
+    {
+      "from": "Tool: Knowledge Graph Search",
+      "to": "Market Research AI Agent",
+      "connection_type": "ai_tool",
+      "note": "This is the 4th tool available to the AI Agent (after query_businesses, query_reviews, analyze_opportunities)"
+    }
+  ],
+  
+  "system_prompt_update": {
+    "target_node": "Market Research AI Agent",
+    "parameter_path": "options.systemMessage",
+    "section_to_add": "\n\n## Hybrid Query Strategy (SQL + Knowledge Graph)\n\nYou now have 4 tools:\n1. query_businesses (SQL) - Exact filters, aggregations\n2. query_reviews (SQL) - Review text search\n3. analyze_opportunities (SQL) - Market analysis views\n4. search_knowledge_graph (Graph) - Entity resolution, semantic search ← NEW\n\n### When to use Knowledge Graph tool:\n\n**Entity Resolution:**\n- \"Is ABC Cooling the same as ABC Cooling & Heating Inc?\"\n- \"Which businesses might be duplicates?\"\n- \"Find canonical name for business XYZ\"\n\n**Semantic Search:**\n- \"Find businesses similar to [specific business name]\"\n- \"What companies are like XYZ in terms of offerings?\"\n- \"Businesses with similar customer profiles\"\n\n**Relationship Discovery:**\n- \"What businesses share similar complaint patterns?\"\n- \"Find companies with overlapping service areas\"\n- \"Businesses in the same supply chain\"\n\n### When to use SQL tools instead:\n\n**Exact Filters:** City, category, rating, review_count → query_businesses\n**Review Analysis:** Keyword search, sentiment analysis → query_reviews\n**Market Metrics:** Opportunity scores, market leaders → analyze_opportunities\n\n### Hybrid Query Pattern (Use Both):\n\nExample: \"Find best Phoenix HVAC businesses and similar competitors\"\n\nStep 1 (SQL): Filter Phoenix HVAC businesses\nStep 2 (SQL): Query market_leaders view for top performers\nStep 3 (Graph): For each top business, find similar entities\nStep 4: Synthesize results with specific names and numbers\n\nAlways cite:\n- Business names\n- Similarity scores (from graph queries)\n- SQL metrics (ratings, review counts)\n- Both SQL and graph sources when combining results",
+    "instructions": "Add this section to the EXISTING system prompt. Do not replace the entire prompt, just append this section."
+  },
+  
+  "verification_steps": {
+    "step_1": "Save workflow after adding tool node",
+    "step_2": "Verify tool is connected to AI Agent (should see 4 ai_tool connections)",
+    "step_3": "Open chat interface",
+    "step_4": "Ask: 'What tools do you have available?'",
+    "step_5": "AI should list 4 tools including search_knowledge_graph",
+    "step_6": "Test entity resolution: 'Is ABC Cooling in the database?'",
+    "step_7": "Check execution log to verify search_knowledge_graph tool was called",
+    "step_8": "Test hybrid query: 'Find best Phoenix HVAC and similar competitors'",
+    "step_9": "Verify BOTH query_businesses AND search_knowledge_graph used"
+  },
+  
+  "expected_tool_connections": {
+    "Market Research AI Agent": {
+      "ai_languageModel": ["OpenAI Chat Model"],
+      "ai_memory": ["Postgres Chat Memory"],
+      "ai_tool": [
+        "Tool: Query Businesses (existing)",
+        "Tool: Query Reviews (existing)",
+        "Tool: Analyze Opportunities (existing)",
+        "Tool: Knowledge Graph Search (NEW)"
+      ]
+    }
+  },
+  
+  "example_queries": {
+    "entity_resolution": {
+      "user_query": "Is ABC Cooling the same as ABC Cooling & Heating Inc?",
+      "expected_tool": "search_knowledge_graph",
+      "expected_response_structure": "AI should return similarity score and reasoning about whether entities are the same"
+    },
+    "semantic_search": {
+      "user_query": "Find businesses similar to XYZ Plumbing",
+      "expected_tool": "search_knowledge_graph",
+      "expected_response_structure": "AI should return list of similar businesses with similarity scores"
+    },
+    "hybrid_query": {
+      "user_query": "Best Phoenix HVAC businesses and their competitors",
+      "expected_tools": ["query_businesses or analyze_opportunities", "search_knowledge_graph"],
+      "expected_response_structure": "AI should first filter with SQL, then expand with graph similarity, then synthesize"
+    },
+    "sql_only": {
+      "user_query": "How many Phoenix HVAC businesses have rating > 4.5?",
+      "expected_tool": "query_businesses",
+      "should_not_use": "search_knowledge_graph",
+      "reasoning": "Exact filter + count aggregation is SQL-appropriate"
+    }
+  },
+  
+  "troubleshooting": {
+    "tool_not_showing": {
+      "issue": "AI Agent doesn't mention search_knowledge_graph tool",
+      "check": [
+        "Verify tool node is connected via ai_tool connection",
+        "Check tool name exactly matches 'search_knowledge_graph' (no typos)",
+        "Confirm tool description is populated"
+      ]
+    },
+    "tool_not_being_used": {
+      "issue": "AI never calls search_knowledge_graph even for entity resolution queries",
+      "check": [
+        "System prompt includes hybrid query strategy section",
+        "Tool description clearly explains when to use",
+        "Query phrasing matches examples in tool description"
+      ],
+      "fix": "Update system prompt with more explicit examples and decision rules"
+    },
+    "tool_returns_errors": {
+      "issue": "search_knowledge_graph tool call fails",
+      "check": [
+        "Graphiti MCP server running: curl http://localhost:3000/health",
+        "URL in tool config correct (including port 3000)",
+        "Request body format matches Graphiti API expectations"
+      ]
+    }
+  },
+  
+  "rollback_instructions": {
+    "if_issues": "To rollback, delete 'Tool: Knowledge Graph Search' node and remove the hybrid query section from system prompt",
+    "chat_functionality": "Existing SQL-based chat will continue working normally. Only knowledge graph queries will be unavailable."
+  }
+}

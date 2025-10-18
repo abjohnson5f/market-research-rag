@@ -1,0 +1,51 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "={{ $env.GRAPHITI_URL || 'http://localhost:3000' }}/graphiti/add_memory",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $json.entity_name }}"
+            },
+            {
+              "name": "episode_body",
+              "value": "={{ $json.entity_description }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxRetries": 3,
+            "waitBetweenRetries": 1000
+          }
+        }
+      },
+      "id": "mcp-client-add-memory",
+      "name": "Add to Knowledge Graph",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, 0],
+      "continueOnFail": true,
+      "notes": "Writes entity to Graphiti knowledge graph via MCP. If this fails, workflow continues (Postgres write still succeeds)."
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "HTTP Request building block to write entities to Graphiti knowledge graph via MCP API",
+    "usage": "Connect after preparing entity_name and entity_description fields. Requires GRAPHITI_URL environment variable.",
+    "inputs_required": {
+      "entity_name": "string - Name of the entity (e.g., business name)",
+      "entity_description": "string - Human-readable description with all entity attributes"
+    },
+    "error_handling": "Continue On Fail enabled - workflow proceeds even if graph write fails"
+  }
+}
