@@ -37,7 +37,7 @@ The workflow uses `neondatabase/schema-diff-action@v1` to automatically post a c
 - **Constraint modifications**
 
 **Example comment:**
-```
+```text
 📊 Schema Diff Report
 
 Comparing: main → preview/pr-15-issue-12-strategic-views
@@ -131,7 +131,7 @@ Each PR gets a unique database branch:
 - Branch name: `preview/pr-15-issue-12-strategic-views`
 
 **Connection string:** Available in GitHub Actions logs as:
-```
+```yaml
 ${{ steps.create_neon_branch.outputs.db_url }}
 ```
 
