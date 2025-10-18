@@ -6,9 +6,11 @@
 --
 -- Design principles:
 -- 1. JSONB for semi-structured data (Apify schema changes frequently)
--- 2. Generated columns for common filters (city, rating, etc.)
--- 3. One-to-many relationships (business → reviews)
--- 4. Full-text search on review text
+-- 2. Generated columns for immutable extractions (city, rating on businesses table)
+-- 3. Trigger-populated columns for mutable extractions (stars, review_text on reviews table - Postgres 17 compatibility)
+-- 4. One-to-many relationships (business → reviews)
+-- 5. Full-text search on review text
+-- 6. Multi-layered data quality (defensive triggers + CHECK constraints)
 -- ============================================================================
 
 -- ============================================================================
@@ -84,18 +86,24 @@ CREATE TABLE IF NOT EXISTS business_reviews (
     -- Store entire review as JSONB (fields vary by review)
     review_data JSONB NOT NULL,
 
-    -- Generated columns for filtering/sorting
-    reviewer_name TEXT GENERATED ALWAYS AS (review_data->>'reviewerName') STORED,
-    stars INT GENERATED ALWAYS AS ((review_data->>'stars')::int) STORED,
-    review_text TEXT GENERATED ALWAYS AS (review_data->>'text') STORED,
-    published_at DATE GENERATED ALWAYS AS ((review_data->>'publishedAtDate')::date) STORED,
+    -- Extracted columns for filtering/sorting (not generated due to Postgres 17 immutability requirements)
+    -- Populated automatically by extract_review_fields() trigger (with defensive error handling)
+    reviewer_name TEXT,
+    stars INT,
+    review_text TEXT,
+    published_at DATE,
 
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    -- Data quality constraints: Validate stars is valid rating scale (NULL allowed for malformed data)
+    CONSTRAINT valid_stars_range CHECK (stars IS NULL OR stars BETWEEN 0 AND 5)
 );
 
 COMMENT ON TABLE business_reviews IS 'Individual customer reviews - one-to-many with businesses';
 COMMENT ON COLUMN business_reviews.review_data IS 'Full review object: text, stars, reviewer info, images, owner response, etc.';
-COMMENT ON COLUMN business_reviews.review_text IS 'Extracted for full-text search - stored as generated column';
+COMMENT ON COLUMN business_reviews.stars IS 'Rating (0-5 scale). NULL if malformed in source data. Analytics should use COALESCE(stars, 0) or filter WHERE stars IS NOT NULL.';
+COMMENT ON COLUMN business_reviews.review_text IS 'Extracted for full-text search - automatically populated by trigger';
+COMMENT ON COLUMN business_reviews.published_at IS 'Publication date. NULL if unparseable in source data.';
 
 
 -- ============================================================================
@@ -113,6 +121,66 @@ CREATE TRIGGER update_businesses_updated_at
     BEFORE UPDATE ON businesses
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ============================================================================
+-- TRIGGER: Extract review fields from JSONB
+-- ============================================================================
+-- Postgres 17+ requires immutable generated columns, but JSONB extraction is STABLE
+-- Solution: Use trigger to populate extracted columns on INSERT/UPDATE
+--
+-- DATA QUALITY STRATEGY (Fail-Open with Validation):
+-- 1. Trigger: Defensive casting - malformed types become NULL (graceful degradation)
+-- 2. Constraint: Range validation - valid types but wrong values rejected (data integrity)
+-- 3. Result: Best of both worlds - resilient to API changes, strict on valid data
+--
+-- Example scenarios:
+--   stars: 5           → SUCCESS (valid integer, valid range)
+--   stars: "five"      → NULL (malformed type, trigger catches, logs warning)
+--   stars: 99          → REJECT (valid type, invalid range, constraint catches)
+--   stars: null        → NULL (missing data allowed, analytics handle gracefully)
+--
+-- Trade-off: NULL values in analytics require COALESCE/filtering, but system never crashes
+CREATE OR REPLACE FUNCTION extract_review_fields()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Extract reviewer name (safe - text always succeeds)
+    NEW.reviewer_name := NEW.review_data->>'reviewerName';
+
+    -- Extract stars with defensive casting (default to NULL if unparseable)
+    BEGIN
+        NEW.stars := (NEW.review_data->>'stars')::int;
+    EXCEPTION WHEN OTHERS THEN
+        NEW.stars := NULL;
+        -- Note: NEW.id is NULL during BEFORE INSERT, so use reviewer/date for identification
+        RAISE WARNING 'Invalid stars value for reviewer "%" (published %): got "%"',
+            COALESCE(NEW.review_data->>'reviewerName', 'Unknown'),
+            COALESCE(NEW.review_data->>'publishedAtDate', 'unknown date'),
+            NEW.review_data->>'stars';
+    END;
+
+    -- Extract review text (safe - text always succeeds)
+    NEW.review_text := NEW.review_data->>'text';
+
+    -- Extract published date with defensive casting (default to NULL if unparseable)
+    BEGIN
+        NEW.published_at := (NEW.review_data->>'publishedAtDate')::date;
+    EXCEPTION WHEN OTHERS THEN
+        NEW.published_at := NULL;
+        -- Note: NEW.id is NULL during BEFORE INSERT, so use reviewer for identification
+        RAISE WARNING 'Invalid date value for reviewer "%": got "%"',
+            COALESCE(NEW.review_data->>'reviewerName', 'Unknown'),
+            NEW.review_data->>'publishedAtDate';
+    END;
+
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER extract_review_fields_trigger
+    BEFORE INSERT OR UPDATE ON business_reviews
+    FOR EACH ROW
+    EXECUTE FUNCTION extract_review_fields();
 
 
 -- ============================================================================

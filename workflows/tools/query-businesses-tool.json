@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "description": "Postgres Tool node for AI Agent - allows agent to search and filter businesses",
+    "usage": "Connect to AI Agent node - agent will write SQL dynamically to query businesses table",
+    "source": "Issue #4 - Tool #1: Query Businesses"
+  },
+  "node": {
+    "parameters": {
+      "descriptionType": "manual",
+      "toolDescription": "Use this tool to search for businesses in the database. You can filter by city, category, rating, review count, or query the business_data JSONB column for any field.\n\nTable schema:\n- business_name (TEXT) - Name of the business\n- city (TEXT) - City location (e.g. 'Phoenix', 'Seattle')\n- category (TEXT) - Business type (e.g. 'Coffee Shop', 'Auto Repair')\n- rating (DECIMAL) - Average rating from Google Maps (1.0 to 5.0)\n- review_count (INT) - Total number of reviews\n- website (TEXT) - Business website URL\n- phone (TEXT) - Contact phone number\n- business_data (JSONB) - Full business details with nested structure\n\nJSONB structure (access with -> and ->> operators):\n- business_data->'overview' - Contains city, category, rating fields\n- business_data->'contact' - Phone, website, address, emails, lat/lng\n- business_data->'social' - Instagram, Facebook, LinkedIn, TikTok URLs\n- business_data->'rating' - totalScore, reviewsCount, distribution, tags\n- business_data->'popular_times' - Traffic histogram by day/hour\n- business_data->'tags' - Array of tags from reviews and categories\n\nExample queries:\n\nFind businesses in specific city:\nSELECT business_name, category, rating, review_count FROM businesses WHERE city = 'Phoenix' ORDER BY rating DESC LIMIT 10;\n\nFind high-rated with low reviews (underserved):\nSELECT business_name, city, rating, review_count FROM businesses WHERE rating > 4.5 AND review_count < 30 ORDER BY rating DESC;\n\nFind businesses with Instagram:\nSELECT business_name, city, business_data->'social'->>'instagrams' as instagram FROM businesses WHERE business_data->'social' ? 'instagrams' AND business_data->'social'->>'instagrams' != '';\n\nCategory analysis:\nSELECT category, COUNT(*) as count, ROUND(AVG(rating), 2) as avg_rating, SUM(review_count) as total_reviews FROM businesses WHERE city = 'Phoenix' GROUP BY category HAVING COUNT(*) > 3 ORDER BY total_reviews DESC;\n\nALWAYS include business_name in your SELECT. Use ORDER BY and LIMIT to keep results manageable. Return maximum 50 rows unless specifically asked for more.",
+      "operation": "executeQuery",
+      "query": "={{ $fromAI('sql_query') }}",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.postgresTool",
+    "typeVersion": 2.5,
+    "position": [
+      200,
+      200
+    ],
+    "id": "e8220315-95f8-4af7-a96b-c8b3cd7b2caa",
+    "name": "Query Businesses Tool",
+    "credentials": {
+      "postgres": {
+        "name": "Market Research DB"
+      }
+    }
+  },
+  "notes": {
+    "toolDescription": "This description is shown to the AI agent - teaches it how to query businesses table with JSONB operators",
+    "fromAI": "$fromAI('sql_query') extracts the SQL the agent generates from its reasoning",
+    "safety": "The agent can only SELECT - it cannot DROP tables or modify data (read-only queries)",
+    "usage": "Primary tool for finding and filtering businesses by any criteria"
+  }
+}

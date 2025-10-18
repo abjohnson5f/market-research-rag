@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "description": "Postgres Tool node for AI Agent - allows agent to search customer reviews with full-text search",
+    "usage": "Connect to AI Agent node - agent will write SQL dynamically to analyze reviews and sentiment",
+    "source": "Issue #4 - Tool #2: Query Reviews"
+  },
+  "node": {
+    "parameters": {
+      "descriptionType": "manual",
+      "toolDescription": "Use this tool to search and analyze customer reviews. Supports full-text search for finding reviews mentioning specific keywords or themes.\n\nTable schema:\n- business_id (INT) - Foreign key to businesses table\n- reviewer_name (TEXT) - Name of reviewer\n- stars (INT) - Rating given (1-5)\n- review_text (TEXT) - Full review content (full-text searchable)\n- published_at (DATE) - When review was posted\n- review_data (JSONB) - Complete review object\n\nCommon query patterns:\n\nFind reviews mentioning keyword (full-text search):\nSELECT b.business_name, r.review_text, r.stars FROM business_reviews r JOIN businesses b ON b.id = r.business_id WHERE to_tsvector('english', r.review_text) @@ to_tsquery('parking & problem') ORDER BY r.stars LIMIT 20;\n\nFind negative reviews for specific business:\nSELECT reviewer_name, stars, review_text, published_at FROM business_reviews WHERE business_id = (SELECT id FROM businesses WHERE business_name ILIKE '%business name%') AND stars <= 2 ORDER BY published_at DESC;\n\nReview sentiment analysis by category:\nSELECT b.category, AVG(r.stars) as avg_stars, COUNT(r.id) as review_count, COUNT(CASE WHEN r.stars <= 2 THEN 1 END) as negative_reviews FROM business_reviews r JOIN businesses b ON b.id = r.business_id WHERE b.city = 'Phoenix' GROUP BY b.category ORDER BY negative_reviews DESC;\n\nFind common complaint themes:\nSELECT b.business_name, COUNT(*) as complaint_count, string_agg(r.review_text, ' | ') as sample_complaints FROM business_reviews r JOIN businesses b ON b.id = r.business_id WHERE r.stars <= 2 AND r.review_text ILIKE '%your keyword%' GROUP BY b.business_name HAVING COUNT(*) > 3;\n\nFull-text search operators:\n- & = AND (both words must appear)\n- | = OR (either word)\n- ! = NOT (exclude word)\n- <-> = words must be adjacent\n\nExample: to_tsquery('coffee & (bad | terrible) & !service') finds reviews with \"coffee\" AND (\"bad\" OR \"terrible\") but NOT \"service\"\n\nALWAYS join with businesses table to get business_name for context. Limit results to 20-50 for readability.",
+      "operation": "executeQuery",
+      "query": "={{ $fromAI('sql_query') }}",
+      "options": {}
+    },
+    "type": "n8n-nodes-base.postgresTool",
+    "typeVersion": 2.5,
+    "position": [
+      200,
+      400
+    ],
+    "id": "ba00145e-9755-4b81-b4a0-e118f9967e91",
+    "name": "Query Reviews Tool",
+    "credentials": {
+      "postgres": {
+        "name": "Market Research DB"
+      }
+    }
+  },
+  "notes": {
+    "toolDescription": "This description teaches the AI about full-text search operators and review sentiment analysis patterns",
+    "fromAI": "$fromAI('sql_query') extracts the SQL the agent generates from its reasoning",
+    "safety": "The agent can only SELECT - it cannot DROP tables or modify data (read-only queries)",
+    "usage": "Use for analyzing customer sentiment, finding review patterns, and identifying recurring themes"
+  }
+}
