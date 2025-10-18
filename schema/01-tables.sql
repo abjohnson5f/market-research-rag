@@ -84,11 +84,11 @@ CREATE TABLE IF NOT EXISTS business_reviews (
     -- Store entire review as JSONB (fields vary by review)
     review_data JSONB NOT NULL,
 
-    -- Generated columns for filtering/sorting
-    reviewer_name TEXT GENERATED ALWAYS AS (review_data->>'reviewerName') STORED,
-    stars INT GENERATED ALWAYS AS ((review_data->>'stars')::int) STORED,
-    review_text TEXT GENERATED ALWAYS AS (review_data->>'text') STORED,
-    published_at DATE GENERATED ALWAYS AS ((review_data->>'publishedAtDate')::date) STORED,
+    -- Extracted columns for filtering/sorting (not generated due to Postgres 17 immutability requirements)
+    reviewer_name TEXT,
+    stars INT,
+    review_text TEXT,
+    published_at DATE,
 
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -113,6 +113,28 @@ CREATE TRIGGER update_businesses_updated_at
     BEFORE UPDATE ON businesses
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ============================================================================
+-- TRIGGER: Extract review fields from JSONB
+-- ============================================================================
+-- Postgres 17+ requires immutable generated columns, but JSONB extraction is STABLE
+-- Solution: Use trigger to populate extracted columns on INSERT/UPDATE
+CREATE OR REPLACE FUNCTION extract_review_fields()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.reviewer_name := NEW.review_data->>'reviewerName';
+    NEW.stars := (NEW.review_data->>'stars')::int;
+    NEW.review_text := NEW.review_data->>'text';
+    NEW.published_at := (NEW.review_data->>'publishedAtDate')::date;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER extract_review_fields_trigger
+    BEFORE INSERT OR UPDATE ON business_reviews
+    FOR EACH ROW
+    EXECUTE FUNCTION extract_review_fields();
 
 
 -- ============================================================================
